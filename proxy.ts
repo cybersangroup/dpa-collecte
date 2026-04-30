@@ -29,12 +29,16 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
+  /*
+   * Le matcher exclut explicitement :
+   *  - les fichiers statiques (_next/static, _next/image, favicon, icons, images)
+   *  - manifest.webmanifest  → doit être public pour le PWA
+   *  - sw.js / workbox-*     → Service Worker généré par next-pwa
+   *  - /api/auth/*           → endpoints NextAuth (login, session, csrf…)
+   *  - /qr/*                 → formulaire public étudiant via QR code
+   *  - /offline              → page fallback hors-ligne du PWA
+   */
   matcher: [
-    "/connexion",
-    "/tableau-de-bord/:path*",
-    "/etudiants/:path*",
-    "/tournees/:path*",
-    "/utilisateurs/:path*",
-    "/parametres/:path*",
+    "/((?!_next/static|_next/image|favicon\\.ico|icons/|logo\\.png|manifest\\.webmanifest|sw\\.js|workbox-.*\\.js|api/auth|qr/|offline).*)",
   ],
 };

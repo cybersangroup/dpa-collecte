@@ -1,12 +1,11 @@
-import { Logo } from "@/components/branding/Logo";
+import { MobileNav } from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/Button";
 
 export function Topbar({ title }: { title: string }) {
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-card/80 backdrop-blur px-4 sm:px-6">
-      <div className="lg:hidden">
-        <Logo size={32} />
-      </div>
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card/80 backdrop-blur px-4 sm:px-6">
+      {/* Bouton hamburger (mobile seulement) — rendu côté client via MobileNav */}
+      <MobileNav />
 
       <h1 className="text-base sm:text-lg font-semibold tracking-tight flex-1 truncate">
         {title}
