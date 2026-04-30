@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+/** Routes nécessitant une session active */
 const protectedPrefixes = [
   "/tableau-de-bord",
   "/etudiants",
@@ -10,8 +11,35 @@ const protectedPrefixes = [
   "/parametres",
 ];
 
+/**
+ * Ressources publiques qui ne doivent JAMAIS être bloquées,
+ * même si le matcher les capture par accident.
+ */
+const publicPaths = [
+  "/manifest.webmanifest",
+  "/offline",
+  "/sw.js",
+  "/connexion",
+];
+
+function isPublicPath(pathname: string) {
+  if (publicPaths.includes(pathname)) return true;
+  if (pathname.startsWith("/icons/")) return true;
+  if (pathname.startsWith("/api/auth/")) return true;
+  if (pathname.startsWith("/qr/")) return true;
+  if (pathname.startsWith("/workbox-")) return true;
+  if (pathname.startsWith("/_next/")) return true;
+  return false;
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+
+  // Laisse passer toutes les ressources publiques sans vérification de token
+  if (isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
   const isProtectedRoute = protectedPrefixes.some(
@@ -29,16 +57,6 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  /*
-   * Le matcher exclut explicitement :
-   *  - les fichiers statiques (_next/static, _next/image, favicon, icons, images)
-   *  - manifest.webmanifest  → doit être public pour le PWA
-   *  - sw.js / workbox-*     → Service Worker généré par next-pwa
-   *  - /api/auth/*           → endpoints NextAuth (login, session, csrf…)
-   *  - /qr/*                 → formulaire public étudiant via QR code
-   *  - /offline              → page fallback hors-ligne du PWA
-   */
-  matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|icons/|logo\\.png|manifest\\.webmanifest|sw\\.js|workbox-.*\\.js|api/auth|qr/|offline).*)",
-  ],
+  // Applique le proxy sur toutes les routes sauf les fichiers statiques Next.js
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico).*)"],
 };
