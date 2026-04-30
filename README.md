@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DPA Collecte
 
-## Getting Started
+Interface de collecte d'étudiants pour Digital Profsan Academy (DPA), avec:
 
-First, run the development server:
+- formulaires opérateur et QR public,
+- dashboard d'administration,
+- base PostgreSQL (Prisma),
+- exécution Docker.
+
+## 1) Démarrage local (sans Docker)
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Application: `http://localhost:3000`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Accès depuis le réseau local (ex. `http://192.168.x.x:3000`)**  
+Le script `dev` écoute sur `0.0.0.0` pour accepter l’IP LAN. Alignez dans `.env` :
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `NEXT_PUBLIC_APP_URL`
+- `NEXTAUTH_URL`
 
-## Learn More
+sur la **même URL** que celle utilisée dans le navigateur (sinon cookies / requêtes RSC peuvent échouer).
 
-To learn more about Next.js, take a look at the following resources:
+## 2) Démarrage Docker (app + postgres)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Prerequis: Docker Desktop démarré.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose up --build
+```
 
-## Deploy on Vercel
+- App: `http://localhost:3000`
+- DB: `localhost:5432`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Stop:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+docker compose down
+```
+
+## 3) Prisma + PostgreSQL
+
+Variables d'environnement (voir `.env.example`):
+
+- `DATABASE_URL`
+- `NEXT_PUBLIC_APP_URL`
+
+Commandes utiles:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run db:studio
+```
+
+## 4) QR et test mobile
+
+Les QR sont maintenant **réels et scannables**.  
+Important: pour scanner depuis un téléphone, le QR doit pointer vers une URL atteignable par le mobile.
+
+- En local pur: `http://localhost:3000` ne marche pas depuis un autre appareil.
+- Utiliser l'IP LAN de la machine hôte, ex: `http://192.168.1.20:3000`.
+- Définir `NEXT_PUBLIC_APP_URL` avec cette valeur.

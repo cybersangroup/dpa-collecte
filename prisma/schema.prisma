@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATEUR
+}
+
+enum StudentSource {
+  OPERATEUR
+  QR_AUTO
+}
+
+model User {
+  id            String     @id @default(cuid())
+  username      String     @unique
+  nomComplet    String
+  passwordHash  String
+  avatarUrl     String?
+  role          UserRole   @default(OPERATEUR)
+  cityId        String
+  city          City       @relation(fields: [cityId], references: [id])
+  actif         Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  studentsAdded Student[]  @relation("AddedByUser")
+  campaigns     Campaign[] @relation("CreatedByUser")
+  auditLogs     AuditLog[]
+}
+
+model City {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  nom         String
+  countryCode String
+  countryName String
+  actif       Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  users       User[]
+  students    Student[]
+  campaigns   Campaign[]
+}
+
+model StudyLevel {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  label     String
+  actif     Boolean   @default(true)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  students  Student[]
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  titre       String
+  cityId      String
+  city        City      @relation(fields: [cityId], references: [id])
+  startsAt    DateTime
+  endsAt      DateTime
+  qrToken     String    @unique
+  qrIsActive  Boolean   @default(true)
+  createdById String?
+  createdBy   User?     @relation("CreatedByUser", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  students    Student[]
+
+  @@index([cityId, startsAt])
+}
+
+model Student {
+  id           String        @id @default(cuid())
+  nomComplet   String
+  adresse      String
+  telephone    String
+  countryCode  String?
+  cityId       String
+  city         City          @relation(fields: [cityId], references: [id])
+  studyLevelId String
+  studyLevel   StudyLevel    @relation(fields: [studyLevelId], references: [id])
+  source       StudentSource @default(OPERATEUR)
+  campaignId   String?
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+  addedById    String?
+  addedBy      User?         @relation("AddedByUser", fields: [addedById], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([cityId, createdAt])
+  @@index([nomComplet])
+  @@index([telephone])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  payload   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
