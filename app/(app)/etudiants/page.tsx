@@ -4,15 +4,23 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { db } from "@/lib/db";
+import { ProfileType } from "@prisma/client";
+import React from "react";
 
 export const dynamic = "force-dynamic";
+
+const profileLabels: Record<ProfileType, { label: string; color: "primary" | "warning" | "outline" | "success" }> = {
+  ETUDIANT_ELEVE: { label: "Étudiant/Élève", color: "primary" },
+  PROF:           { label: "Professeur",      color: "success" },
+  SURVEILLANT:    { label: "Surveillant",      color: "warning" },
+  PARENT:         { label: "Parent",           color: "outline" },
+};
 
 export default async function EtudiantsPage() {
   noStore();
   const students = await db.student.findMany({
     include: {
       city: true,
-      studyLevel: true,
       addedBy: true,
     },
     orderBy: { createdAt: "desc" },
@@ -30,7 +38,7 @@ export default async function EtudiantsPage() {
               Liste des étudiants collectés
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {students.length} étudiants récents
+              {students.length} personnes enregistrées
             </p>
           </div>
 
@@ -40,7 +48,7 @@ export default async function EtudiantsPage() {
             </Button>
             <Link href="/etudiants/ajouter">
               <Button size="md">
-                <IconPlus /> Ajouter un étudiant
+                <IconPlus /> Ajouter
               </Button>
             </Link>
           </div>
@@ -52,9 +60,10 @@ export default async function EtudiantsPage() {
             <table className="w-full text-sm">
               <thead className="bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <Th sortable active>Nom complet</Th>
+                  <Th sortable active>Nom / Prénom</Th>
+                  <Th>Profil</Th>
                   <Th>Téléphone</Th>
-                  <Th>Niveau</Th>
+                  <Th>Niveau / Info</Th>
                   <Th sortable>Site</Th>
                   <Th>Ajouté par</Th>
                   <Th>Source</Th>
@@ -63,47 +72,64 @@ export default async function EtudiantsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-semibold">
-                          {s.nomComplet.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                {students.map((s) => {
+                  const profil = profileLabels[s.profileType] ?? profileLabels.ETUDIANT_ELEVE;
+                  const initials = `${s.nom[0] ?? ""}${s.prenom[0] ?? ""}`.toUpperCase();
+                  const niveauInfo = s.niveauScolaire
+                    ? s.niveauScolaire
+                    : s.nombreEleves != null
+                    ? `${s.nombreEleves} élève(s)`
+                    : "—";
+                  return (
+                    <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-semibold">
+                            {initials}
+                          </div>
+                          <div>
+                            <p className="font-medium">{s.nom} {s.prenom}</p>
+                            {s.etablissement && (
+                              <p className="text-xs text-muted-foreground">{s.etablissement}</p>
+                            )}
+                          </div>
                         </div>
-                        <span className="font-medium">{s.nomComplet}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                      {s.telephone}
-                    </td>
-                    <td className="px-4 py-3">{s.studyLevel.label}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={s.city.code === "DKR" ? "primary" : "warning"}>
-                        {s.city.code}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {s.addedBy?.nomComplet ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={s.source === "QR_AUTO" ? "success" : "outline"}>
-                        {s.source === "QR_AUTO" ? "QR auto" : "Opérateur"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {formatDateTime(s.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="icon" aria-label="Plus d'actions">
-                        <IconMore />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={profil.color}>{profil.label}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                        {s.telephone}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{niveauInfo}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={s.city.code === "DKR" ? "primary" : "warning"}>
+                          {s.city.code}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {s.addedBy?.nomComplet ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={s.source === "QR_AUTO" ? "success" : "outline"}>
+                          {s.source === "QR_AUTO" ? "QR auto" : "Opérateur"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        {formatDateTime(s.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="icon" aria-label="Plus d'actions">
+                          <IconMore />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {students.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      Aucun étudiant en base pour le moment.
+                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      Aucune personne enregistrée pour le moment.
                     </td>
                   </tr>
                 )}

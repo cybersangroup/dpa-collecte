@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -16,6 +16,13 @@ enum UserRole {
 enum StudentSource {
   OPERATEUR
   QR_AUTO
+}
+
+enum ProfileType {
+  ETUDIANT_ELEVE
+  PROF
+  SURVEILLANT
+  PARENT
 }
 
 model User {
@@ -49,17 +56,6 @@ model City {
   campaigns   Campaign[]
 }
 
-model StudyLevel {
-  id        String    @id @default(cuid())
-  code      String    @unique
-  label     String
-  actif     Boolean   @default(true)
-  order     Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  students  Student[]
-}
-
 model Campaign {
   id          String    @id @default(cuid())
   titre       String
@@ -79,25 +75,32 @@ model Campaign {
 }
 
 model Student {
-  id           String        @id @default(cuid())
-  nomComplet   String
-  adresse      String
-  telephone    String
-  countryCode  String?
-  cityId       String
-  city         City          @relation(fields: [cityId], references: [id])
-  studyLevelId String
-  studyLevel   StudyLevel    @relation(fields: [studyLevelId], references: [id])
-  source       StudentSource @default(OPERATEUR)
-  campaignId   String?
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
-  addedById    String?
-  addedBy      User?         @relation("AddedByUser", fields: [addedById], references: [id])
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  profileType    ProfileType   @default(ETUDIANT_ELEVE)
+  nom            String
+  prenom         String
+  genre          String?       // "M", "F", "Autre"
+  age            Int?
+  telephone      String
+  countryCode    String?
+  // Visible pour ETUDIANT_ELEVE et PROF — null pour SURVEILLANT/PARENT
+  niveauScolaire String?
+  // Visible pour SURVEILLANT et PARENT — null pour ETUDIANT_ELEVE/PROF
+  nombreEleves   Int?
+  // Masqué pour PARENT
+  etablissement  String?
+  cityId         String
+  city           City          @relation(fields: [cityId], references: [id])
+  source         StudentSource @default(OPERATEUR)
+  campaignId     String?
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id])
+  addedById      String?
+  addedBy        User?         @relation("AddedByUser", fields: [addedById], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([cityId, createdAt])
-  @@index([nomComplet])
+  @@index([nom])
   @@index([telephone])
 }
 

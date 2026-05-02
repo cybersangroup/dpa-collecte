@@ -1,12 +1,23 @@
+import { notFound } from "next/navigation";
 import { Logo } from "@/components/branding/Logo";
 import { StudentForm } from "@/components/forms/StudentForm";
+import { db } from "@/lib/db";
 
 export default async function QrPage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  await params;
+  const { token } = await params;
+
+  const campaign = await db.campaign.findUnique({
+    where: { qrToken: token },
+    select: { id: true, cityId: true, qrIsActive: true, endsAt: true },
+  });
+
+  if (!campaign || !campaign.qrIsActive || campaign.endsAt < new Date()) {
+    notFound();
+  }
 
   return (
     <div className="min-h-dvh flex flex-col bg-background">
@@ -28,7 +39,11 @@ export default async function QrPage({
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-sm">
-            <StudentForm mode="qr" />
+            <StudentForm
+              mode="qr"
+              cityId={campaign.cityId}
+              campaignId={campaign.id}
+            />
           </div>
         </div>
       </main>
