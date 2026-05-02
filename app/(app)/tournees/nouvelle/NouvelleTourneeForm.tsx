@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -12,16 +11,19 @@ type City = { id: string; code: string; nom: string; countryName: string };
 const initialState: CampaignFormState = { status: "idle" };
 
 export function NouvelleTourneeForm({ cities }: { cities: City[] }) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, isPending] = useActionState(createCampaign, initialState);
 
   useEffect(() => {
     if (state.status === "success") {
-      router.push("/tournees");
-      router.refresh();
+      // Délai pour que le bandeau vert soit visible, puis rechargement complet
+      // (window.location bypasse le cache client de Next.js)
+      const t = setTimeout(() => {
+        window.location.assign("/tournees");
+      }, 1200);
+      return () => clearTimeout(t);
     }
-  }, [state, router]);
+  }, [state]);
 
   return (
     <>
@@ -37,9 +39,10 @@ export function NouvelleTourneeForm({ cities }: { cities: City[] }) {
       {state.status === "success" && (
         <div
           role="status"
-          className="mb-4 rounded-lg border border-emerald-400/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+          className="mb-4 rounded-lg border border-emerald-400/40 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-2"
         >
-          Tournée créée avec succès ! Redirection…
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          Tournée créée ! Redirection vers la liste…
         </div>
       )}
 

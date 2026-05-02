@@ -75,3 +75,25 @@ export async function createCampaign(
     return { status: "error", message: "Impossible d'enregistrer la tournée. Réessayez dans un instant." };
   }
 }
+
+export async function deleteCampaigns(ids: string[]): Promise<{ ok: boolean; message?: string }> {
+  if (!ids || ids.length === 0) return { ok: false, message: "Aucune tournée sélectionnée." };
+
+  try {
+    // Supprimer d'abord les étudiants liés pour respecter les contraintes FK
+    await db.student.updateMany({
+      where: { campaignId: { in: ids } },
+      data: { campaignId: null },
+    });
+
+    await db.campaign.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    revalidatePath("/tournees");
+    return { ok: true };
+  } catch (err) {
+    console.error("[deleteCampaigns]", err);
+    return { ok: false, message: "Erreur lors de la suppression. Réessayez." };
+  }
+}
