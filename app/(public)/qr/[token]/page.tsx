@@ -1,20 +1,18 @@
 import { Logo } from "@/components/branding/Logo";
 import { StudentForm } from "@/components/forms/StudentForm";
-import { Badge } from "@/components/ui/Badge";
 
 export default async function QrPage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = await params;
+  await params;
 
   return (
     <div className="min-h-dvh flex flex-col bg-background">
       <header className="border-b border-border bg-card">
-        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 h-16 flex items-center justify-center">
           <Logo size={36} withWordmark />
-          <Badge variant="success">Tournée en cours · DKR</Badge>
         </div>
       </header>
 
@@ -25,18 +23,13 @@ export default async function QrPage({
               Bienvenue à Digital Profsan Academy
             </h1>
             <p className="mt-2 text-muted-foreground text-sm sm:text-base">
-              Remplissez ce formulaire pour vous enregistrer auprès de notre équipe.
-              Vos données sont confidentielles et utilisées uniquement par DPA.
+              Remplissez ce formulaire pour vous enregistrer.
             </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-sm">
             <StudentForm mode="qr" />
           </div>
-
-          <p className="mt-4 text-center text-[11px] text-muted-foreground">
-            Token : <span className="font-mono">{token.slice(0, 8)}…</span> · Sécurisé
-          </p>
         </div>
       </main>
 

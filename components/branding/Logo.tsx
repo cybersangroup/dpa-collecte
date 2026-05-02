@@ -35,22 +35,13 @@ export function Logo({
       </div>
 
       {withWordmark && (
-        <div className="flex flex-col leading-none">
-          <span
-            className={`text-[15px] font-semibold tracking-tight ${
-              isLight ? "text-white" : "text-foreground"
-            }`}
-          >
-            Digital Profsan
-          </span>
-          <span
-            className={`text-[11px] uppercase tracking-[0.18em] mt-0.5 ${
-              isLight ? "text-white/70" : "text-muted-foreground"
-            }`}
-          >
-            Academy · Collecte
-          </span>
-        </div>
+        <span
+          className={`text-[15px] font-semibold tracking-tight leading-none ${
+            isLight ? "text-white" : "text-foreground"
+          }`}
+        >
+          Digital Profsan
+        </span>
       )}
     </div>
   );

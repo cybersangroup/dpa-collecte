@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function EtudiantsPage() {
+  noStore();
   const students = await db.student.findMany({
     include: {
       city: true,
