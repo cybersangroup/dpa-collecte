@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/cn";
 import { createStudent, type StudentFormState } from "@/app/(app)/etudiants/actions";
-import { StudentSource } from "@prisma/client";
 
 /* ─── Types de profil ─── */
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
@@ -31,7 +30,7 @@ const initialState: StudentFormState = { status: "idle" };
 
 export function StudentForm({ mode, cityId, campaignId }: Props) {
   const isQr = mode === "qr";
-  const source: StudentSource = isQr ? StudentSource.QR_AUTO : StudentSource.OPERATEUR;
+  const source = isQr ? "QR_AUTO" : "OPERATEUR" as const;
 
   const boundAction = createStudent.bind(null, { cityId, campaignId, source });
   const [state, action, isPending] = useActionState(boundAction, initialState);
