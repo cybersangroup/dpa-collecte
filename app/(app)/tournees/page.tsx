@@ -6,6 +6,8 @@ import { QrPreview } from "@/components/qr/QrPreview";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function TourneesPage() {
   const publicAppUrl = getPublicAppUrl();
   const now = new Date();

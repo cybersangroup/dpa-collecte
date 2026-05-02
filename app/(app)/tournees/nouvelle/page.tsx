@@ -1,49 +1,30 @@
-import { redirect } from "next/navigation";
-import { randomBytes } from "crypto";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { db } from "@/lib/db";
+import { createCampaign } from "../actions";
 
-async function createCampaign(formData: FormData) {
-  "use server";
+export const dynamic = "force-dynamic";
 
-  const titre = String(formData.get("titre") ?? "").trim();
-  const cityId = String(formData.get("cityId") ?? "").trim();
-  const startsAt = String(formData.get("startsAt") ?? "").trim();
-  const endsAt = String(formData.get("endsAt") ?? "").trim();
+const erreurMessages: Record<string, string> = {
+  champs: "Merci de remplir tous les champs obligatoires.",
+  dates: "Les dates de début et de fin ne sont pas valides.",
+  ordre: "La date de fin doit être postérieure à la date de début.",
+  ville: "La ville sélectionnée est invalide ou inactive.",
+  db: "Impossible d’enregistrer la tournée. Réessayez dans un instant.",
+};
 
-  if (!titre || !cityId || !startsAt || !endsAt) return;
+type PageProps = {
+  searchParams?: Promise<{ erreur?: string }>;
+};
 
-  const startsAtDate = new Date(startsAt);
-  const endsAtDate = new Date(endsAt);
+export default async function NouvelleTourneePage({ searchParams }: PageProps) {
+  const sp = (await searchParams) ?? {};
+  const erreurKey = typeof sp.erreur === "string" ? sp.erreur : undefined;
+  const erreurText = erreurKey ? erreurMessages[erreurKey] ?? erreurMessages.db : null;
 
-  if (Number.isNaN(startsAtDate.getTime()) || Number.isNaN(endsAtDate.getTime())) return;
-
-  const qrToken = `camp_${randomBytes(8).toString("hex")}`;
-  const defaultAdmin = await db.user.findFirst({
-    where: { role: "ADMIN", actif: true },
-    select: { id: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  await db.campaign.create({
-    data: {
-      titre,
-      cityId,
-      startsAt: startsAtDate,
-      endsAt: endsAtDate,
-      qrToken,
-      createdById: defaultAdmin?.id,
-    },
-  });
-
-  redirect("/tournees");
-}
-
-export default async function NouvelleTourneePage() {
   const cities = await db.city.findMany({
     where: { actif: true },
     orderBy: { nom: "asc" },
@@ -62,6 +43,15 @@ export default async function NouvelleTourneePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {erreurText ? (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                >
+                  {erreurText}
+                </div>
+              ) : null}
+
               <form action={createCampaign} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="titre">Titre de campagne</Label>
@@ -83,6 +73,11 @@ export default async function NouvelleTourneePage() {
                       </option>
                     ))}
                   </select>
+                  {cities.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Aucune ville en base. Exécutez le seed Prisma ou ajoutez des villes.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
