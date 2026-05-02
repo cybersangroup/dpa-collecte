@@ -96,6 +96,7 @@ export async function loadDashboardData(userDisplayName: string | null): Promise
         addedBy: { select: { nomComplet: true } },
         city: { select: { code: true } },
       },
+      // nom + prenom remplacent nomComplet depuis la refonte Student
     }),
     db.student.groupBy({
       by: ["cityId"],
@@ -148,17 +149,18 @@ export async function loadDashboardData(userDisplayName: string | null): Promise
   const recent: RecentRow[] = recentStudents.map((s) => {
     const site = s.city.code;
     const when = timeAgoFr(s.createdAt);
+    const fullName = `${s.nom} ${s.prenom}`.trim();
     if (s.source === StudentSource.QR_AUTO) {
       return {
         who: "QR public",
-        what: `auto-inscription ${s.nomComplet}`,
+        what: `auto-inscription ${fullName}`,
         when,
         site,
       };
     }
     return {
       who: shortName(s.addedBy?.nomComplet) || "Opérateur",
-      what: `a ajouté ${s.nomComplet}`,
+      what: `a ajouté ${fullName}`,
       when,
       site,
     };
