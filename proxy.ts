@@ -26,6 +26,7 @@ function isPublicPath(pathname: string) {
   if (publicPaths.includes(pathname)) return true;
   if (pathname.startsWith("/icons/")) return true;
   if (pathname.startsWith("/api/auth/")) return true;
+  if (pathname.startsWith("/api/debug")) return true;
   if (pathname.startsWith("/qr/")) return true;
   if (pathname.startsWith("/workbox-")) return true;
   if (pathname.startsWith("/_next/")) return true;
