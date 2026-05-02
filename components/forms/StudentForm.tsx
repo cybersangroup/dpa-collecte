@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import { createStudent, type StudentFormState } from "@/app/(app)/etudiants/actions";
 
 /* URL de la chaîne WhatsApp DPA — à personnaliser */
-const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VaDPA0000000000000";
+const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029Vb8Bw8uDeON58ldFoB3h";
 
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
 
