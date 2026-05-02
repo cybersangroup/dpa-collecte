@@ -124,14 +124,11 @@ export default function ParametresPage() {
             <CardHeader>
               <CardTitle>À propos</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-1">
-              <p>DPA Collecte · version 0.1.0 (maquette)</p>
-              <p>Digital Profsan Academy — Sénégal & Djibouti</p>
-              <p className="pt-2">
-                Support :{" "}
-                <span className="text-foreground font-medium">
-                  support@dpa-academy.sn
-                </span>
+            <CardContent className="text-sm text-muted-foreground">
+              <p>
+                DPA Collecte . version 0.1.0{" "}
+                <span className="text-muted-foreground/60">|</span>{" "}
+                <span className="text-foreground">© Equipe Tech Cybersan</span>
               </p>
             </CardContent>
           </Card>
