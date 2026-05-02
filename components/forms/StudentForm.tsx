@@ -1,21 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/cn";
 import { createStudent, type StudentFormState } from "@/app/(app)/etudiants/actions";
 
-/* ─── Types de profil ─── */
+/* URL de la chaîne WhatsApp DPA — à personnaliser */
+const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VaDPA0000000000000";
+
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
 
 const profiles: { value: ProfileType; label: string; icon: string }[] = [
   { value: "ETUDIANT_ELEVE", label: "Étudiant / Élève", icon: "🎓" },
-  { value: "PROF", label: "Professeur", icon: "📚" },
-  { value: "SURVEILLANT", label: "Surveillant", icon: "👁️" },
-  { value: "PARENT", label: "Parent", icon: "👨‍👩‍👦" },
+  { value: "PROF",           label: "Professeur",        icon: "📚" },
+  { value: "SURVEILLANT",    label: "Surveillant",        icon: "👁️" },
+  { value: "PARENT",         label: "Parent",             icon: "👨‍👩‍👦" },
 ];
 
 type Mode = "operateur" | "qr";
@@ -30,50 +32,127 @@ const initialState: StudentFormState = { status: "idle" };
 
 export function StudentForm({ mode, cityId, campaignId }: Props) {
   const isQr = mode === "qr";
-  const source = isQr ? "QR_AUTO" : "OPERATEUR" as const;
+  const source = isQr ? "QR_AUTO" : ("OPERATEUR" as const);
 
   const boundAction = createStudent.bind(null, { cityId, campaignId, source });
   const [state, action, isPending] = useActionState(boundAction, initialState);
 
-  const [profile, setProfile] = React.useState<ProfileType>("ETUDIANT_ELEVE");
-  const [countryIso, setCountryIso] = React.useState("SN");
-  const selectedCountry = countryPhoneOptions.find((c) => c.iso === countryIso) ?? countryPhoneOptions[0];
+  /* État local du formulaire */
+  const [profile, setProfile]       = useState<ProfileType>("ETUDIANT_ELEVE");
+  const [countryIso, setCountryIso] = useState("SN");
+  const [formKey, setFormKey]       = useState(0); // incrémenter pour vider les inputs HTML
+  const [showWaPopup, setShowWaPopup] = useState(false);
+  const [countdown, setCountdown]   = useState(5);
 
-  const showNiveau = profile === "ETUDIANT_ELEVE" || profile === "PROF";
-  const showNombreEleves = profile === "SURVEILLANT" || profile === "PARENT";
+  const selectedCountry = countryPhoneOptions.find((c) => c.iso === countryIso) ?? countryPhoneOptions[0];
+  const showNiveau       = profile === "ETUDIANT_ELEVE" || profile === "PROF";
+  const showNombreEleves = profile === "SURVEILLANT"    || profile === "PARENT";
   const showEtablissement = profile !== "PARENT";
 
+  /* ── Succès QR : réinitialiser le formulaire puis afficher le popup WA ── */
   useEffect(() => {
-    if (state.status === "success") {
-      const t = setTimeout(() => {
-        if (isQr) {
-          // Recharge la page QR pour réinitialiser le formulaire
-          window.location.reload();
-        } else {
-          window.location.assign("/etudiants");
-        }
-      }, 1500);
+    if (state.status !== "success") return;
+
+    if (isQr) {
+      // Vider le formulaire
+      setProfile("ETUDIANT_ELEVE");
+      setCountryIso("SN");
+      setFormKey((k) => k + 1);
+
+      // Afficher le popup WhatsApp après 1 s
+      const t = setTimeout(() => setShowWaPopup(true), 1000);
+      return () => clearTimeout(t);
+    } else {
+      // Mode opérateur → redirection vers la liste
+      const t = setTimeout(() => window.location.assign("/etudiants"), 1500);
       return () => clearTimeout(t);
     }
-  }, [state, isQr]);
+  }, [state.status, isQr]);
+
+  /* ── Décompte dans le popup WA ── */
+  useEffect(() => {
+    if (!showWaPopup) { setCountdown(5); return; }
+    if (countdown <= 0) {
+      window.open(WHATSAPP_CHANNEL_URL, "_blank", "noopener,noreferrer");
+      setShowWaPopup(false);
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [showWaPopup, countdown]);
 
   return (
     <div className="space-y-5">
-      {/* Feedback */}
+      {/* Popup WhatsApp */}
+      {showWaPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl border border-border shadow-xl max-w-sm w-full p-6 space-y-4 text-center">
+            <div className="mx-auto h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center text-2xl">
+              💬
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Merci pour votre inscription !</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Vous allez être redirigé vers la chaîne WhatsApp de Digital Profsan Academy.
+              </p>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Redirection automatique dans{" "}
+              <span className="font-semibold text-foreground">{countdown}s</span>…
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                size="lg"
+                className="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white"
+                onClick={() => {
+                  window.open(WHATSAPP_CHANNEL_URL, "_blank", "noopener,noreferrer");
+                  setShowWaPopup(false);
+                }}
+              >
+                Accéder à la chaîne WhatsApp →
+              </Button>
+              <Button
+                variant="ghost"
+                size="md"
+                className="w-full text-muted-foreground"
+                onClick={() => setShowWaPopup(false)}
+              >
+                Rester sur cette page
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback succès (QR) */}
+      {state.status === "success" && isQr && (
+        <div role="status" className="rounded-lg border border-emerald-400/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Inscription enregistrée ! Le formulaire a été réinitialisé.
+        </div>
+      )}
+
+      {/* Feedback succès (opérateur) */}
+      {state.status === "success" && !isQr && (
+        <div role="status" className="rounded-lg border border-emerald-400/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Enregistré avec succès ! Redirection…
+        </div>
+      )}
+
+      {/* Feedback erreur */}
       {state.status === "error" && (
         <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {state.message}
         </div>
       )}
-      {state.status === "success" && (
-        <div role="status" className="rounded-lg border border-emerald-400/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
-          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-          {isQr ? "Inscription enregistrée ! Merci." : "Enregistré avec succès ! Redirection…"}
-        </div>
-      )}
 
-      <form action={action} className="space-y-5">
-        {/* Champ caché profileType */}
+      {/* Le formKey force le re-mount du formulaire pour vider les inputs natifs */}
+      <form key={formKey} action={action} className="space-y-5">
         <input type="hidden" name="profileType" value={profile} />
 
         {/* Sélecteur de profil */}
@@ -100,10 +179,10 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
           </div>
         </div>
 
-        {/* Nom + Prénom */}
+        {/* Nom complet + Prénom */}
         <div className="grid sm:grid-cols-2 gap-4">
-          <FormField id="nom" label="Nom" required disabled={isPending} placeholder="Ndiaye" />
-          <FormField id="prenom" label="Prénom" required disabled={isPending} placeholder="Mariam" />
+          <FormField id="nom"    label="Nom complet" required disabled={isPending} />
+          <FormField id="prenom" label="Prénom"               disabled={isPending} />
         </div>
 
         {/* Genre + Âge */}
@@ -130,7 +209,6 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
             min={5}
             max={120}
             disabled={isPending}
-            placeholder="25"
           />
         </div>
 
@@ -159,7 +237,6 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
               inputMode="tel"
               required
               disabled={isPending}
-              placeholder="77 123 45 67"
               className="flex-1"
             />
           </div>
@@ -168,13 +245,16 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
           </p>
         </div>
 
+        {/* Adresse — pour tout le monde */}
+        <FormField id="adresse" label="Adresse" disabled={isPending} />
+
         {/* Niveau scolaire — ETUDIANT_ELEVE et PROF */}
         {showNiveau && (
           <FormField
             id="niveauScolaire"
             label="Niveau scolaire"
             disabled={isPending}
-            placeholder={profile === "PROF" ? "Ex. Licence, Master…" : "Ex. Tle S, 3ème, BTS…"}
+            placeholder={profile === "PROF" ? "Licence, Master…" : "Tle S, 3ème, BTS…"}
             helper="Précisez la classe ou le niveau de diplôme."
           />
         )}
@@ -188,8 +268,11 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
             inputMode="numeric"
             min={0}
             disabled={isPending}
-            placeholder="Ex. 35"
-            helper={profile === "PARENT" ? "Nombre d'enfants scolarisés." : "Nombre d'élèves sous votre responsabilité."}
+            helper={
+              profile === "PARENT"
+                ? "Nombre d'enfants scolarisés."
+                : "Nombre d'élèves sous votre responsabilité."
+            }
           />
         )}
 
@@ -199,11 +282,10 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
             id="etablissement"
             label="Établissement"
             disabled={isPending}
-            placeholder="Nom de l'école ou lycée"
           />
         )}
 
-        {/* Bloc "Ajouté par" — mode opérateur uniquement */}
+        {/* Bloc "Ajouté par" — opérateur uniquement */}
         {!isQr && (
           <div className="rounded-lg bg-secondary/60 border border-border px-4 py-3 flex items-center gap-3 text-sm">
             <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
@@ -219,9 +301,9 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
             Réinitialiser
           </Button>
           <Button type="submit" size="lg" className="sm:flex-[2]" disabled={isPending}>
-            {isPending ? (
-              <><SpinnerIcon /> Enregistrement…</>
-            ) : isQr ? "Je m'inscris" : "Enregistrer"}
+            {isPending
+              ? <><SpinnerIcon /> Enregistrement…</>
+              : isQr ? "Je m'inscris" : "Enregistrer"}
           </Button>
         </div>
       </form>
@@ -229,7 +311,7 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
   );
 }
 
-/* ─── Composants helpers ─── */
+/* ─── Helpers ─── */
 
 function FormField({
   id,
@@ -263,8 +345,6 @@ function SpinnerIcon() {
     </svg>
   );
 }
-
-/* ─── Indicatifs téléphoniques ─── */
 
 const countryPhoneOptions = [
   { iso: "SN", flag: "🇸🇳", dialCode: "+221", label: "Senegal" },

@@ -89,6 +89,7 @@ model Student {
   nombreEleves   Int?
   // Masqué pour PARENT
   etablissement  String?
+  adresse        String?
   cityId         String
   city           City          @relation(fields: [cityId], references: [id])
   source         StudentSource @default(OPERATEUR)
