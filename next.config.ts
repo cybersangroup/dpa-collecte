@@ -30,6 +30,9 @@ export default withPWA({
   dest: "public",
   register: true,
   disable: process.env.NODE_ENV === "development",
+  // Force le nouveau SW à prendre le contrôle immédiatement sans attendre
+  // que tous les onglets de l'ancienne version soient fermés.
+  skipWaiting: true,
   fallbacks: {
     document: "/offline",
   },
