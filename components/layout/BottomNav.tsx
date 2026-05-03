@@ -66,7 +66,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-30 lg:hidden border-t border-border bg-card/95 backdrop-blur-md safe-bottom">
+    <nav className="fixed bottom-0 inset-x-0 z-30 lg:hidden border-t border-border bg-card" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="flex items-stretch h-16">
         {items.map((item) => {
           const active =
