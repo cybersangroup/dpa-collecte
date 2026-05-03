@@ -74,26 +74,30 @@ export default async function EtudiantsPage() {
               <tbody className="divide-y divide-border">
                 {students.map((s) => {
                   const profil = profileLabels[s.profileType] ?? profileLabels.ETUDIANT_ELEVE;
-                  const initials = `${s.nom[0] ?? ""}${s.prenom[0] ?? ""}`.toUpperCase();
-                  const niveauInfo = s.niveauScolaire
+                  const initials = `${s.nom[0] ?? ""}${s.prenom?.[0] ?? ""}`.toUpperCase();
+                  const niveauInfo = s.classe
+                    ? `${s.niveauScolaire ?? ""} — ${s.classe}`.replace(/^— /, "")
+                    : s.niveauScolaire
                     ? s.niveauScolaire
                     : s.nombreEleves != null
                     ? `${s.nombreEleves} élève(s)`
                     : "—";
                   return (
-                    <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
+                    <tr key={s.id} className="hover:bg-secondary/30 transition-colors cursor-pointer group">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <Link href={`/etudiants/${s.id}`} className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-semibold">
                             {initials}
                           </div>
                           <div>
-                            <p className="font-medium">{s.nom} {s.prenom}</p>
+                            <p className="font-medium group-hover:text-primary transition-colors">
+                              {s.nom} {s.prenom}
+                            </p>
                             {s.etablissement && (
                               <p className="text-xs text-muted-foreground">{s.etablissement}</p>
                             )}
                           </div>
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={profil.color}>{profil.label}</Badge>
@@ -101,7 +105,7 @@ export default async function EtudiantsPage() {
                       <td className="px-4 py-3 text-muted-foreground tabular-nums">
                         {s.telephone}
                       </td>
-                      <td className="px-4 py-3 text-sm">{niveauInfo}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{niveauInfo}</td>
                       <td className="px-4 py-3">
                         <Badge variant={s.city.code === "DKR" ? "primary" : "warning"}>
                           {s.city.code}
@@ -119,9 +123,11 @@ export default async function EtudiantsPage() {
                         {formatDateTime(s.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" aria-label="Plus d'actions">
-                          <IconMore />
-                        </Button>
+                        <Link href={`/etudiants/${s.id}`}>
+                          <Button variant="ghost" size="icon" aria-label="Voir le détail">
+                            <IconChevron />
+                          </Button>
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -203,12 +209,10 @@ function IconDownload() {
   );
 }
 
-function IconMore() {
+function IconChevron() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="5" cy="12" r="1.6" />
-      <circle cx="12" cy="12" r="1.6" />
-      <circle cx="19" cy="12" r="1.6" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
     </svg>
   );
 }

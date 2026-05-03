@@ -17,7 +17,7 @@ const NIVEAUX_CLASSES: Record<string, string[]> = {
   "Primaire":    ["CP", "CE1", "CE2", "CM1", "CM2"],
   "Collège":     ["6ème", "5ème", "4ème", "3ème"],
   "Lycée":       ["Seconde", "Première", "Terminale"],
-  "Supérieur":   ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2", "Doctorat"],
+  "Supérieur":   ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2"],
 };
 
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
