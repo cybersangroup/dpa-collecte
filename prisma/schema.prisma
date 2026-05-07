@@ -120,3 +120,57 @@ model AuditLog {
 
   @@index([createdAt])
 }
+
+// ─── Formations d'été ──────────────────────────────────────────────────
+
+enum CategorieFormation {
+  ENFANT
+  ADULTE
+}
+
+enum TypeInscrit {
+  ADULTE
+  PARENT
+}
+
+model Formation {
+  id          String             @id @default(cuid())
+  nom         String
+  description String?
+  categorie   CategorieFormation
+  duree       String?            // Ex. "2 semaines", "1 mois"
+  prix        String?            // Ex. "15 000 FCFA"
+  actif       Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  inscriptions Inscription[]
+
+  @@unique([nom])
+  @@index([categorie, actif])
+}
+
+model Inscription {
+  id          String              @id @default(cuid())
+  type        TypeInscrit
+  telephone   String
+  countryCode String?
+  adresse     String?
+  formationId String
+  formation   Formation           @relation(fields: [formationId], references: [id])
+  enfants     InscriptionEnfant[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([formationId, createdAt])
+  @@index([telephone])
+}
+
+model InscriptionEnfant {
+  id            String      @id @default(cuid())
+  inscriptionId String
+  inscription   Inscription @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
+  nom           String
+  createdAt     DateTime    @default(now())
+
+  @@index([inscriptionId])
+}
