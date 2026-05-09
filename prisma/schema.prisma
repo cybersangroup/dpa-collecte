@@ -37,9 +37,10 @@ model User {
   actif         Boolean    @default(true)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  studentsAdded Student[]  @relation("AddedByUser")
-  campaigns     Campaign[] @relation("CreatedByUser")
-  auditLogs     AuditLog[]
+  studentsAdded      Student[]     @relation("AddedByUser")
+  campaigns          Campaign[]    @relation("CreatedByUser")
+  auditLogs          AuditLog[]
+  inscriptionsAdded  Inscription[] @relation("InscriptionAddedBy")
 }
 
 model City {
@@ -134,15 +135,16 @@ enum TypeInscrit {
 }
 
 model Formation {
-  id          String             @id @default(cuid())
-  nom         String
-  description String?
-  categorie   CategorieFormation
-  duree       String?            // Ex. "2 semaines", "1 mois"
-  prix        String?            // Ex. "15 000 FCFA"
-  actif       Boolean            @default(true)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id           String             @id @default(cuid())
+  nom          String
+  description  String?
+  categorie    CategorieFormation
+  duree        String?            // Ex. "2 semaines", "1 mois"
+  prix         String?            // Montant seul, Ex. "15 000"
+  devise       String             @default("FCFA") // FCFA | FDJ | USD
+  actif        Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
   inscriptions Inscription[]
 
   @@unique([nom])
@@ -158,6 +160,9 @@ model Inscription {
   formationId String
   formation   Formation           @relation(fields: [formationId], references: [id])
   enfants     InscriptionEnfant[]
+  recuUrl     String?             // URL du reçu de paiement (Vercel Blob)
+  addedById   String?             // Null si inscription publique
+  addedBy     User?               @relation("InscriptionAddedBy", fields: [addedById], references: [id])
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 

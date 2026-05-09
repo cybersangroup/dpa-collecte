@@ -17,6 +17,7 @@ type Formation = {
   categorie: "ENFANT" | "ADULTE";
   duree: string | null;
   prix: string | null;
+  devise: string;
   actif: boolean;
   _count: { inscriptions: number };
 };
@@ -77,8 +78,16 @@ function FormationForm({
           <input name="duree" defaultValue={initial?.duree ?? ""} placeholder="Ex. 2 semaines" className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Prix</label>
-          <input name="prix" defaultValue={initial?.prix ?? ""} placeholder="Ex. 35 000 FCFA" className={inputClass} />
+          <label className={labelClass}>Montant</label>
+          <input name="prix" defaultValue={initial?.prix ?? ""} placeholder="Ex. 35 000" className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Devise</label>
+          <select name="devise" defaultValue={initial?.devise ?? "FCFA"} className={inputClass}>
+            <option value="FCFA">FCFA</option>
+            <option value="FDJ">FDJ</option>
+            <option value="USD">USD</option>
+          </select>
         </div>
         {initial && (
           <div>
@@ -200,7 +209,7 @@ export function FormationsClient({ formations: initial, isAdmin }: Props) {
                     )}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {f.duree && <span>⏱ {f.duree}</span>}
-                      {f.prix  && <span>💰 {f.prix}</span>}
+                      {f.prix  && <span>💰 {f.prix} {f.devise}</span>}
                       <span>📋 {f._count.inscriptions} inscription(s)</span>
                     </div>
                     {isAdmin && (

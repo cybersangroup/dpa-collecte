@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { put } from "@vercel/blob";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,21 @@ export type FormationFormState =
   | { status: "error"; message: string }
   | { status: "success" };
 
-// ─── Inscription publique ────────────────────────────────────────────────────
+// ─── Upload reçu ─────────────────────────────────────────────────────────────
+
+async function uploadRecu(file: File | null): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  if (file.size > 5 * 1024 * 1024) throw new Error("Le reçu ne doit pas dépasser 5 Mo.");
+  if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+    throw new Error("Le reçu doit être une image (JPG, PNG, WEBP) ou un PDF.");
+  }
+  const ext  = file.name.split(".").pop() ?? "jpg";
+  const name = `recus/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const blob = await put(name, file, { access: "public" });
+  return blob.url;
+}
+
+// ─── Inscription ─────────────────────────────────────────────────────────────
 
 export async function createInscription(
   _prev: InscriptionFormState,
@@ -42,15 +57,30 @@ export async function createInscription(
       return { status: "error", message: "Formation introuvable ou inactive." };
     }
 
-    // Enfants (uniquement pour type PARENT)
-    const enfantsData: { nom: string }[] = [];
-    if (type === "PARENT") {
-      const nombreEnfants = parseInt(String(formData.get("nombreEnfants") ?? "0"), 10) || 0;
-      for (let i = 0; i < nombreEnfants; i++) {
-        const nomEnfant = String(formData.get(`enfant_${i}`) ?? "").trim();
-        if (nomEnfant) enfantsData.push({ nom: nomEnfant });
+    // Upload reçu
+    let recuUrl: string | null = null;
+    try {
+      const recuFile = formData.get("recu") as File | null;
+      recuUrl = await uploadRecu(recuFile);
+    } catch (uploadErr) {
+      if (uploadErr instanceof Error) {
+        return { status: "error", message: uploadErr.message };
       }
     }
+
+    // Enfants (PARENT uniquement)
+    const enfantsData: { nom: string }[] = [];
+    if (type === "PARENT") {
+      const n = parseInt(String(formData.get("nombreEnfants") ?? "0"), 10) || 0;
+      for (let i = 0; i < n; i++) {
+        const nom = String(formData.get(`enfant_${i}`) ?? "").trim();
+        if (nom) enfantsData.push({ nom });
+      }
+    }
+
+    // Utilisateur connecté (inscription via l'interface admin)
+    const session   = await getServerSession(authOptions);
+    const addedById = session?.user?.id ?? null;
 
     await db.inscription.create({
       data: {
@@ -59,6 +89,8 @@ export async function createInscription(
         countryCode,
         adresse,
         formationId,
+        recuUrl,
+        addedById,
         enfants: enfantsData.length > 0 ? { create: enfantsData } : undefined,
       },
     });
@@ -92,10 +124,11 @@ export async function createFormation(
     const categorie   = (formData.get("categorie") as "ENFANT" | "ADULTE") ?? "ADULTE";
     const duree       = String(formData.get("duree") ?? "").trim() || null;
     const prix        = String(formData.get("prix") ?? "").trim() || null;
+    const devise      = String(formData.get("devise") ?? "FCFA").trim();
 
     if (!nom) return { status: "error", message: "Le nom est obligatoire." };
 
-    await db.formation.create({ data: { nom, description, categorie, duree, prix, actif: true } });
+    await db.formation.create({ data: { nom, description, categorie, duree, prix, devise, actif: true } });
     revalidatePath("/formations");
     return { status: "success" };
   } catch (err: unknown) {
@@ -117,11 +150,12 @@ export async function updateFormation(
     const categorie   = (formData.get("categorie") as "ENFANT" | "ADULTE") ?? "ADULTE";
     const duree       = String(formData.get("duree") ?? "").trim() || null;
     const prix        = String(formData.get("prix") ?? "").trim() || null;
+    const devise      = String(formData.get("devise") ?? "FCFA").trim();
     const actif       = formData.get("actif") === "true";
 
     if (!nom) return { status: "error", message: "Le nom est obligatoire." };
 
-    await db.formation.update({ where: { id }, data: { nom, description, categorie, duree, prix, actif } });
+    await db.formation.update({ where: { id }, data: { nom, description, categorie, duree, prix, devise, actif } });
     revalidatePath("/formations");
     return { status: "success" };
   } catch (err: unknown) {

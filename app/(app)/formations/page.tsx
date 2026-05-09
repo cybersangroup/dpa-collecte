@@ -14,7 +14,7 @@ export default async function FormationsPage() {
 
   const formations = await db.formation.findMany({
     include: { _count: { select: { inscriptions: true } } },
-    orderBy: [{ categorie: "asc" }, { nom: "asc" }],
+    orderBy:  [{ categorie: "asc" }, { nom: "asc" }],
   });
 
   return (
@@ -34,6 +34,7 @@ export default async function FormationsPage() {
           formations={formations.map((f) => ({
             ...f,
             categorie: f.categorie as "ENFANT" | "ADULTE",
+            devise: f.devise,
           }))}
           isAdmin={isAdmin}
         />
