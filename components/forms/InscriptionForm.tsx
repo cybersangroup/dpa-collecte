@@ -258,7 +258,6 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
               type="file"
               name="recu"
               accept="image/*,application/pdf"
-              required
               onChange={handleFileChange}
               className="sr-only"
             />

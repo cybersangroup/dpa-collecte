@@ -22,6 +22,10 @@ export type FormationFormState =
 
 async function uploadRecu(file: File | null): Promise<string | null> {
   if (!file || file.size === 0) return null;
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.warn("[uploadRecu] BLOB_READ_WRITE_TOKEN non configuré — reçu non uploadé.");
+    return null;
+  }
   if (file.size > 5 * 1024 * 1024) throw new Error("Le reçu ne doit pas dépasser 5 Mo.");
   if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
     throw new Error("Le reçu doit être une image (JPG, PNG, WEBP) ou un PDF.");
