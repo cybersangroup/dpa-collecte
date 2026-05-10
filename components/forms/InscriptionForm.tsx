@@ -146,15 +146,20 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
           <input type="hidden" name="type" value={type} />
         </div>
 
-        {/* ── 2. Nom du parent ───────────────────────────────────── */}
-        {type === "PARENT" && (
-          <div>
-            <label className={lbl}>
-              Votre nom complet <span className="text-destructive">*</span>
-            </label>
-            <input type="text" name="nomParent" required placeholder="Nom et prénom du parent" className={inp} />
-          </div>
-        )}
+        {/* ── 2. Nom complet (adulte ou parent) ─────────────────── */}
+        <div>
+          <label className={lbl}>
+            {type === "ADULTE" ? "Votre nom complet" : "Votre nom complet (parent / tuteur)"}
+            {" "}<span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            name="nomContact"
+            required
+            placeholder={type === "ADULTE" ? "Nom et prénom" : "Nom et prénom du parent"}
+            className={inp}
+          />
+        </div>
 
         {/* ── 3. Téléphone ───────────────────────────────────────── */}
         <div>
@@ -211,26 +216,32 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
         </div>
 
         {/* ── 6. Créneau horaire ─────────────────────────────────── */}
-        {availableShifts.length > 0 && (
+        {selectedFormationId && (
           <div>
             <label className={lbl}>Créneau horaire <span className="text-destructive">*</span></label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {availableShifts.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedShiftId(s.id)}
-                  className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl border text-sm font-medium transition-all ${
-                    selectedShiftId === s.id
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "border-input bg-background text-foreground/70 hover:bg-secondary"
-                  }`}
-                >
-                  <span className="font-semibold">{s.label}</span>
-                  <span className="text-xs mt-0.5 opacity-80">{s.heureDebut} – {s.heureFin}</span>
-                </button>
-              ))}
-            </div>
+            {availableShifts.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {availableShifts.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedShiftId(selectedShiftId === s.id ? "" : s.id)}
+                    className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl border text-sm font-medium transition-all ${
+                      selectedShiftId === s.id
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                        : "border-input bg-background text-foreground/70 hover:bg-secondary"
+                    }`}
+                  >
+                    <span className="font-semibold">{s.label}</span>
+                    <span className="text-xs mt-0.5 opacity-80">{s.heureDebut} – {s.heureFin}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic py-1">
+                Les créneaux horaires seront communiqués ultérieurement.
+              </p>
+            )}
             <input type="hidden" name="shiftId" value={selectedShiftId} />
           </div>
         )}
@@ -264,7 +275,7 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
         {/* ── 8. Sondage mode de formation ───────────────────────── */}
         <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
           <p className="text-sm font-medium">
-            📊 Sondage rapide : quel mode de formation préférez-vous ?
+            📊 Quel mode de formation préférez-vous ?
           </p>
           <p className="text-xs text-muted-foreground">
             Aidez-nous à adapter nos offres en indiquant votre préférence.

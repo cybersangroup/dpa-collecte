@@ -44,7 +44,8 @@ export async function createInscription(
 ): Promise<InscriptionFormState> {
   try {
     const type        = (formData.get("type") as "ADULTE" | "PARENT") ?? "ADULTE";
-    const nomParent   = type === "PARENT" ? String(formData.get("nomParent") ?? "").trim() || null : null;
+    // nomContact est utilisé pour le nom de l'adulte OU du parent
+    const nomParent   = String(formData.get("nomContact") ?? "").trim() || null;
     const telephone   = String(formData.get("telephone") ?? "").trim();
     const countryCode = String(formData.get("countryCode") ?? "").trim() || null;
     const adresse     = String(formData.get("adresse") ?? "").trim() || null;
