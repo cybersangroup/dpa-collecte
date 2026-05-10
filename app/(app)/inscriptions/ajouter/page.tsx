@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AjouterInscriptionPage() {
   const formations = await db.formation.findMany({
-    where: { actif: true },
-    select: { id: true, nom: true, categorie: true, duree: true, prix: true, devise: true },
+    where:   { actif: true },
+    select:  { id: true, nom: true, categorie: true, duree: true, prix: true, devise: true, frequence: true, jours: true, shifts: { select: { id: true, label: true, heureDebut: true, heureFin: true } } },
     orderBy: [{ categorie: "asc" }, { nom: "asc" }],
   });
 
@@ -26,10 +26,7 @@ export default async function AjouterInscriptionPage() {
 
           <div className="rounded-2xl border border-border bg-card p-5 sm:p-7 shadow-sm">
             <InscriptionForm
-              formations={formations.map((f) => ({
-                ...f,
-                categorie: f.categorie as "ENFANT" | "ADULTE",
-              }))}
+              formations={formations.map((f) => ({ ...f, categorie: f.categorie as "ENFANT" | "ADULTE" }))}
               mode="operator"
             />
           </div>

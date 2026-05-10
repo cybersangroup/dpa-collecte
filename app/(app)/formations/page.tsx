@@ -13,8 +13,11 @@ export default async function FormationsPage() {
   const isAdmin = session?.user?.role === "ADMIN";
 
   const formations = await db.formation.findMany({
-    include: { _count: { select: { inscriptions: true } } },
-    orderBy:  [{ categorie: "asc" }, { nom: "asc" }],
+    include: {
+      _count:  { select: { inscriptions: true } },
+      shifts:  { orderBy: { createdAt: "asc" } },
+    },
+    orderBy: [{ categorie: "asc" }, { nom: "asc" }],
   });
 
   return (
@@ -34,7 +37,10 @@ export default async function FormationsPage() {
           formations={formations.map((f) => ({
             ...f,
             categorie: f.categorie as "ENFANT" | "ADULTE",
-            devise: f.devise,
+            devise:    f.devise,
+            frequence: f.frequence,
+            jours:     f.jours,
+            shifts:    f.shifts,
           }))}
           isAdmin={isAdmin}
         />

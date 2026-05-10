@@ -3,6 +3,8 @@
 import { useActionState, useState, useEffect, useRef, useCallback } from "react";
 import { createInscription, type InscriptionFormState } from "@/app/(app)/inscriptions/actions";
 
+type Shift = { id: string; label: string; heureDebut: string; heureFin: string };
+
 type Formation = {
   id: string;
   nom: string;
@@ -10,11 +12,13 @@ type Formation = {
   duree: string | null;
   prix: string | null;
   devise: string;
+  frequence: string | null;
+  jours: string | null;
+  shifts: Shift[];
 };
 
 type Props = {
   formations: Formation[];
-  /** "public" = page non authentifiée | "operator" = opérateur connecté */
   mode?: "public" | "operator";
 };
 
@@ -30,22 +34,20 @@ const COUNTRY_CODES = [
 
 const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VaBkjtf3GJPLvxXBEs3Y";
 
-const DEVISES = ["FCFA", "FDJ", "USD"];
-
 export function InscriptionForm({ formations, mode = "public" }: Props) {
   const [formKey, setFormKey]             = useState(0);
   const [type, setType]                   = useState<"ADULTE" | "PARENT">("ADULTE");
   const [nombreEnfants, setNombreEnfants] = useState(1);
   const [selectedFormationId, setSelectedFormationId] = useState("");
+  const [selectedShiftId, setSelectedShiftId]         = useState("");
   const [recuPreview, setRecuPreview]     = useState<string | null>(null);
   const [showWhatsApp, setShowWhatsApp]   = useState(false);
   const [countdown, setCountdown]         = useState(5);
   const countdownRef                      = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const initialState: InscriptionFormState = { status: "idle" };
-  const [state, formAction, isPending] = useActionState(createInscription, initialState);
+  const [state, formAction, isPending] = useActionState(createInscription, { status: "idle" } as InscriptionFormState);
 
-  // Succès
+  // Reset au succès
   useEffect(() => {
     if (state.status === "success") {
       setTimeout(() => {
@@ -53,6 +55,7 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
         setType("ADULTE");
         setNombreEnfants(1);
         setSelectedFormationId("");
+        setSelectedShiftId("");
         setRecuPreview(null);
         setCountdown(5);
         if (mode === "public") setShowWhatsApp(true);
@@ -65,11 +68,7 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
     if (!showWhatsApp) return;
     countdownRef.current = setInterval(() => {
       setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(countdownRef.current!);
-          window.location.href = WHATSAPP_CHANNEL_URL;
-          return 0;
-        }
+        if (c <= 1) { clearInterval(countdownRef.current!); window.location.href = WHATSAPP_CHANNEL_URL; return 0; }
         return c - 1;
       });
     }, 1000);
@@ -81,11 +80,11 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
     setShowWhatsApp(false);
   }, []);
 
-  const formationsFiltered = formations.filter((f) =>
-    type === "ADULTE" ? f.categorie === "ADULTE" : f.categorie === "ENFANT"
-  );
+  const formationsFiltered  = formations.filter((f) => type === "ADULTE" ? f.categorie === "ADULTE" : f.categorie === "ENFANT");
+  const selectedFormation   = formationsFiltered.find((f) => f.id === selectedFormationId);
+  const availableShifts     = selectedFormation?.shifts ?? [];
 
-  const selectedFormation = formationsFiltered.find((f) => f.id === selectedFormationId);
+  const handleFormationChange = (id: string) => { setSelectedFormationId(id); setSelectedShiftId(""); };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,11 +94,9 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
     reader.readAsDataURL(file);
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
-  const labelClass = "block text-sm font-medium text-foreground mb-1.5";
-  const selectClass =
-    "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+  const inp = "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+  const lbl = "block text-sm font-medium text-foreground mb-1.5";
+  const sel = "w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
 
   return (
     <>
@@ -115,23 +112,15 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
             <h3 className="text-lg font-semibold mb-1">Inscription enregistrée !</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Rejoignez notre chaîne WhatsApp pour suivre nos actualités et formations.
-              <br />
-              Redirection dans <span className="font-bold text-primary">{countdown}s</span>…
+              <br />Redirection dans <span className="font-bold text-primary">{countdown}s</span>…
             </p>
             <div className="flex flex-col gap-2">
-              <a
-                href={WHATSAPP_CHANNEL_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-              >
+              <a href={WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
                 Accéder à la chaîne WhatsApp
               </a>
-              <button
-                type="button"
-                onClick={handleStay}
-                className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
-              >
+              <button type="button" onClick={handleStay}
+                className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors">
                 Rester sur cette page
               </button>
             </div>
@@ -140,21 +129,16 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
       )}
 
       <form key={formKey} action={formAction} className="space-y-5" encType="multipart/form-data">
-        {/* Qui s'inscrit ? */}
+
+        {/* ── 1. Qui s'inscrit ? ─────────────────────────────────── */}
         <div>
-          <p className={labelClass}>Qui souhaitez-vous inscrire ?</p>
+          <p className={lbl}>Qui souhaitez-vous inscrire ?</p>
           <div className="grid grid-cols-2 gap-2">
             {(["ADULTE", "PARENT"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => { setType(t); setSelectedFormationId(""); }}
-                className={`py-3 rounded-xl border text-sm font-medium transition-all ${
-                  type === t
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                    : "border-input bg-background text-foreground/70 hover:bg-secondary"
-                }`}
-              >
+              <button key={t} type="button" onClick={() => { setType(t); setSelectedFormationId(""); setSelectedShiftId(""); }}
+                className={`py-3 rounded-xl border text-sm font-medium transition-all ${type === t
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                  : "border-input bg-background text-foreground/70 hover:bg-secondary"}`}>
                 {t === "ADULTE" ? "👤 Je m'inscris" : "👨‍👧 J'inscris mon/mes enfant(s)"}
               </button>
             ))}
@@ -162,56 +146,63 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
           <input type="hidden" name="type" value={type} />
         </div>
 
-        {/* Téléphone */}
+        {/* ── 2. Nom du parent ───────────────────────────────────── */}
+        {type === "PARENT" && (
+          <div>
+            <label className={lbl}>
+              Votre nom complet <span className="text-destructive">*</span>
+            </label>
+            <input type="text" name="nomParent" required placeholder="Nom et prénom du parent" className={inp} />
+          </div>
+        )}
+
+        {/* ── 3. Téléphone ───────────────────────────────────────── */}
         <div>
-          <label className={labelClass}>
-            Téléphone <span className="text-destructive">*</span>
-          </label>
+          <label className={lbl}>Téléphone <span className="text-destructive">*</span></label>
           <div className="flex gap-2">
             <select name="countryCode" className="rounded-xl border border-input bg-background px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary w-28 shrink-0">
-              {COUNTRY_CODES.map((c) => (
-                <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-              ))}
+              {COUNTRY_CODES.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
             </select>
-            <input type="tel" name="telephone" required placeholder="Numéro de téléphone" className={inputClass} />
+            <input type="tel" name="telephone" required placeholder="Numéro de téléphone" className={inp} />
           </div>
         </div>
 
-        {/* Adresse */}
+        {/* ── 4. Adresse ─────────────────────────────────────────── */}
         <div>
-          <label className={labelClass}>Adresse</label>
-          <input type="text" name="adresse" placeholder="Votre adresse (optionnel)" className={inputClass} />
+          <label className={lbl}>Adresse</label>
+          <input type="text" name="adresse" placeholder="Votre adresse (optionnel)" className={inp} />
         </div>
 
-        {/* Formation */}
+        {/* ── 5. Formation ───────────────────────────────────────── */}
         <div>
-          <label className={labelClass}>
-            Formation souhaitée <span className="text-destructive">*</span>
-          </label>
-          <select
-            name="formationId"
-            required
-            value={selectedFormationId}
-            onChange={(e) => setSelectedFormationId(e.target.value)}
-            className={selectClass}
-          >
+          <label className={lbl}>Formation souhaitée <span className="text-destructive">*</span></label>
+          <select name="formationId" required value={selectedFormationId} onChange={(e) => handleFormationChange(e.target.value)} className={sel}>
             <option value="">— Choisir une formation —</option>
             {formationsFiltered.map((f) => (
               <option key={f.id} value={f.id}>
-                {f.nom}
-                {f.duree ? ` · ${f.duree}` : ""}
-                {f.prix  ? ` · ${f.prix} ${f.devise}` : ""}
+                {f.nom}{f.duree ? ` · ${f.duree}` : ""}{f.prix ? ` · ${f.prix} ${f.devise}` : ""}
               </option>
             ))}
           </select>
-          {/* Récapitulatif formation sélectionnée */}
-          {selectedFormation && selectedFormation.prix && (
-            <div className="mt-2 flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
-              <span className="text-primary">💰</span>
-              <span>
-                Montant à régler :{" "}
-                <strong>{selectedFormation.prix} {selectedFormation.devise}</strong>
-              </span>
+          {/* Récapitulatif */}
+          {selectedFormation && (
+            <div className="mt-2 rounded-xl border border-border bg-secondary/30 px-4 py-3 space-y-1 text-sm">
+              {selectedFormation.prix && (
+                <p className="flex items-center gap-1.5">
+                  <span>💰</span>
+                  <span>Montant : <strong>{selectedFormation.prix} {selectedFormation.devise}</strong></span>
+                </p>
+              )}
+              {selectedFormation.frequence && (
+                <p className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                  <span>🔁</span><span>{selectedFormation.frequence}</span>
+                </p>
+              )}
+              {selectedFormation.jours && (
+                <p className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                  <span>📅</span><span>{selectedFormation.jours}</span>
+                </p>
+              )}
             </div>
           )}
           {formationsFiltered.length === 0 && (
@@ -219,26 +210,98 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
           )}
         </div>
 
-        {/* ── Message de paiement ─────────────────────────────────────── */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-4 space-y-2">
-          <div className="flex items-center gap-2 font-semibold text-sm text-amber-800 dark:text-amber-300">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {/* ── 6. Créneau horaire ─────────────────────────────────── */}
+        {availableShifts.length > 0 && (
+          <div>
+            <label className={lbl}>Créneau horaire <span className="text-destructive">*</span></label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {availableShifts.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedShiftId(s.id)}
+                  className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl border text-sm font-medium transition-all ${
+                    selectedShiftId === s.id
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                      : "border-input bg-background text-foreground/70 hover:bg-secondary"
+                  }`}
+                >
+                  <span className="font-semibold">{s.label}</span>
+                  <span className="text-xs mt-0.5 opacity-80">{s.heureDebut} – {s.heureFin}</span>
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="shiftId" value={selectedShiftId} />
+          </div>
+        )}
+
+        {/* ── 7. Enfants (PARENT uniquement) ─────────────────────── */}
+        {type === "PARENT" && (
+          <div className="space-y-3 rounded-xl border border-border bg-secondary/30 p-4">
+            <div>
+              <label className={lbl}>Nombre d'enfants <span className="text-destructive">*</span></label>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setNombreEnfants((n) => Math.max(1, n - 1))}
+                  className="w-9 h-9 rounded-full border border-input bg-background flex items-center justify-center text-lg font-medium hover:bg-secondary transition-colors">−</button>
+                <span className="w-8 text-center font-semibold tabular-nums">{nombreEnfants}</span>
+                <button type="button" onClick={() => setNombreEnfants((n) => Math.min(8, n + 1))}
+                  className="w-9 h-9 rounded-full border border-input bg-background flex items-center justify-center text-lg font-medium hover:bg-secondary transition-colors">+</button>
+              </div>
+              <input type="hidden" name="nombreEnfants" value={nombreEnfants} />
+            </div>
+            {Array.from({ length: nombreEnfants }, (_, i) => (
+              <div key={i}>
+                <label className={lbl}>
+                  Nom de l'enfant {nombreEnfants > 1 ? i + 1 : ""} <span className="text-destructive">*</span>
+                </label>
+                <input type="text" name={`enfant_${i}`} required
+                  placeholder={`Nom complet de l'enfant ${nombreEnfants > 1 ? i + 1 : ""}`} className={inp} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── 8. Sondage mode de formation ───────────────────────── */}
+        <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+          <p className="text-sm font-medium">
+            📊 Sondage rapide : quel mode de formation préférez-vous ?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Aidez-nous à adapter nos offres en indiquant votre préférence.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: "PRESENTIEL", label: "🏫 En présentiel", desc: "En classe, sur site" },
+              { value: "EN_LIGNE",   label: "💻 En ligne",      desc: "À distance, flexible" },
+            ].map((opt) => (
+              <label key={opt.value}
+                className="flex flex-col gap-0.5 cursor-pointer rounded-xl border border-input bg-background p-3 text-sm hover:bg-secondary transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-xs text-muted-foreground">{opt.desc}</span>
+                <input type="radio" name="modeFormation" value={opt.value} className="sr-only" />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 9. Message paiement ────────────────────────────────── */}
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-4 space-y-2">
+          <div className="flex items-center gap-2 font-semibold text-sm text-foreground">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-none stroke-current text-amber-600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             Procédez au paiement avant de continuer
           </div>
-          <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
+          <ol className="text-xs text-foreground/80 space-y-1 list-decimal list-inside">
             <li>Effectuez le paiement du montant de la formation via votre wallet (Wave, Orange Money, Waafi…).</li>
             <li>Prenez une <strong>capture d'écran du reçu</strong> de confirmation de paiement.</li>
             <li>Joignez cette capture ci-dessous pour valider votre inscription.</li>
           </ol>
         </div>
 
-        {/* Reçu de paiement */}
+        {/* ── 10. Reçu de paiement (en dernier) ─────────────────── */}
         <div>
-          <label className={labelClass}>
-            Reçu de paiement <span className="text-destructive">*</span>
-          </label>
+          <label className={lbl}>Reçu de paiement</label>
           <label className="flex flex-col items-center justify-center w-full h-36 rounded-xl border-2 border-dashed border-input bg-background hover:bg-secondary/50 cursor-pointer transition-colors relative overflow-hidden">
             {recuPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -254,80 +317,29 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
                 <span className="text-xs">JPG, PNG, WEBP ou PDF · max 5 Mo</span>
               </div>
             )}
-            <input
-              type="file"
-              name="recu"
-              accept="image/*,application/pdf"
-              onChange={handleFileChange}
-              className="sr-only"
-            />
+            <input type="file" name="recu" accept="image/*,application/pdf" onChange={handleFileChange} className="sr-only" />
           </label>
           {recuPreview && (
-            <button
-              type="button"
-              onClick={() => setRecuPreview(null)}
-              className="mt-1 text-xs text-destructive hover:underline"
-            >
+            <button type="button" onClick={() => setRecuPreview(null)} className="mt-1 text-xs text-destructive hover:underline">
               Supprimer l'image
             </button>
           )}
         </div>
 
-        {/* Enfants (PARENT uniquement) */}
-        {type === "PARENT" && (
-          <div className="space-y-3 rounded-xl border border-border bg-secondary/30 p-4">
-            <div>
-              <label className={labelClass}>
-                Nombre d'enfants à inscrire <span className="text-destructive">*</span>
-              </label>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setNombreEnfants((n) => Math.max(1, n - 1))}
-                  className="w-9 h-9 rounded-full border border-input bg-background flex items-center justify-center text-lg font-medium hover:bg-secondary transition-colors">−</button>
-                <span className="w-8 text-center font-semibold tabular-nums">{nombreEnfants}</span>
-                <button type="button" onClick={() => setNombreEnfants((n) => Math.min(8, n + 1))}
-                  className="w-9 h-9 rounded-full border border-input bg-background flex items-center justify-center text-lg font-medium hover:bg-secondary transition-colors">+</button>
-              </div>
-              <input type="hidden" name="nombreEnfants" value={nombreEnfants} />
-            </div>
-            {Array.from({ length: nombreEnfants }, (_, i) => (
-              <div key={i}>
-                <label className={labelClass}>
-                  Nom de l'enfant {nombreEnfants > 1 ? i + 1 : ""}{" "}
-                  <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="text"
-                  name={`enfant_${i}`}
-                  required
-                  placeholder={`Nom complet de l'enfant ${nombreEnfants > 1 ? i + 1 : ""}`}
-                  className={inputClass}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Feedback */}
         {state.status === "error" && (
-          <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-            {state.message}
-          </div>
+          <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">{state.message}</div>
         )}
         {state.status === "success" && (
           <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
             Inscription enregistrée ! Formulaire réinitialisé.
           </div>
         )}
 
         {/* Submit */}
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
+        <button type="submit" disabled={isPending}
+          className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {isPending ? (
             <>
               <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -336,9 +348,7 @@ export function InscriptionForm({ formations, mode = "public" }: Props) {
               </svg>
               Envoi en cours…
             </>
-          ) : (
-            "Envoyer mon inscription"
-          )}
+          ) : "Envoyer mon inscription"}
         </button>
       </form>
     </>

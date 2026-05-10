@@ -142,29 +142,49 @@ model Formation {
   duree        String?            // Ex. "2 semaines", "1 mois"
   prix         String?            // Montant seul, Ex. "15 000"
   devise       String             @default("FCFA") // FCFA | FDJ | USD
+  frequence    String?            // Ex. "2x / semaine"
+  jours        String?            // Ex. "Mardi - Jeudi"
   actif        Boolean            @default(true)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   inscriptions Inscription[]
+  shifts       FormationShift[]
 
   @@unique([nom])
   @@index([categorie, actif])
 }
 
-model Inscription {
-  id          String              @id @default(cuid())
-  type        TypeInscrit
-  telephone   String
-  countryCode String?
-  adresse     String?
+model FormationShift {
+  id          String        @id @default(cuid())
   formationId String
-  formation   Formation           @relation(fields: [formationId], references: [id])
-  enfants     InscriptionEnfant[]
-  recuUrl     String?             // URL du reçu de paiement (Vercel Blob)
-  addedById   String?             // Null si inscription publique
-  addedBy     User?               @relation("InscriptionAddedBy", fields: [addedById], references: [id])
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  formation   Formation     @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  label       String        // Ex. "Matin", "Midi", "Soir"
+  heureDebut  String        // Ex. "07H00"
+  heureFin    String        // Ex. "11H00"
+  createdAt   DateTime      @default(now())
+  inscriptions Inscription[]
+
+  @@index([formationId])
+}
+
+model Inscription {
+  id            String              @id @default(cuid())
+  type          TypeInscrit
+  nomParent     String?             // Nom du parent si type=PARENT
+  telephone     String
+  countryCode   String?
+  adresse       String?
+  formationId   String
+  formation     Formation           @relation(fields: [formationId], references: [id])
+  shiftId       String?             // Créneau horaire choisi
+  shift         FormationShift?     @relation(fields: [shiftId], references: [id])
+  modeFormation String?             // "PRESENTIEL" | "EN_LIGNE" (sondage)
+  enfants       InscriptionEnfant[]
+  recuUrl       String?             // URL du reçu de paiement (Vercel Blob)
+  addedById     String?             // Null si inscription publique
+  addedBy       User?               @relation("InscriptionAddedBy", fields: [addedById], references: [id])
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([formationId, createdAt])
   @@index([telephone])
