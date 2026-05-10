@@ -90,8 +90,8 @@ export function EtudiantsClient({ students }: { students: Student[] }) {
   return (
     <div className="space-y-4">
       {/* Barre de recherche + filtres */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="space-y-2">
+        <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
@@ -99,23 +99,25 @@ export function EtudiantsClient({ students }: { students: Student[] }) {
             placeholder="Rechercher par nom, téléphone, établissement…"
             className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
         </div>
-        <select value={filterProfil} onChange={(e) => setFilterProfil(e.target.value)} className={selClass}>
-          <option value="ALL">Tous les profils</option>
-          <option value="ETUDIANT_ELEVE">Étudiant/Élève</option>
-          <option value="PROF">Professeur</option>
-          <option value="SURVEILLANT">Surveillant</option>
-          <option value="PARENT">Parent</option>
-        </select>
-        <select value={filterSite} onChange={(e) => setFilterSite(e.target.value)} className={selClass}>
-          <option value="ALL">Tous les sites</option>
-          <option value="DKR">DKR</option>
-          <option value="DJIB">DJIB</option>
-        </select>
-        <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className={selClass}>
-          <option value="ALL">Toutes sources</option>
-          <option value="QR_AUTO">QR auto</option>
-          <option value="OPERATOR">Opérateur</option>
-        </select>
+        <div className="flex flex-wrap gap-2">
+          <select value={filterProfil} onChange={(e) => setFilterProfil(e.target.value)} className={selClass + " flex-1 min-w-[140px]"}>
+            <option value="ALL">Tous profils</option>
+            <option value="ETUDIANT_ELEVE">Étudiant/Élève</option>
+            <option value="PROF">Professeur</option>
+            <option value="SURVEILLANT">Surveillant</option>
+            <option value="PARENT">Parent</option>
+          </select>
+          <select value={filterSite} onChange={(e) => setFilterSite(e.target.value)} className={selClass + " flex-1 min-w-[100px]"}>
+            <option value="ALL">Tous sites</option>
+            <option value="DKR">DKR</option>
+            <option value="DJIB">DJIB</option>
+          </select>
+          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className={selClass + " flex-1 min-w-[120px]"}>
+            <option value="ALL">Toutes sources</option>
+            <option value="QR_AUTO">QR auto</option>
+            <option value="OPERATOR">Opérateur</option>
+          </select>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">

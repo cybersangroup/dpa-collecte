@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { Topbar } from "@/components/layout/Topbar";
-import { Button } from "@/components/ui/Button";
 import { db } from "@/lib/db";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { InscriptionsClient } from "./InscriptionsClient";
@@ -27,23 +25,10 @@ export default async function InscriptionsPage() {
     <>
       <Topbar title="Inscriptions formations" />
 
-      <div className="flex-1 p-4 sm:p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Inscriptions aux formations</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {inscriptions.length} inscription(s) enregistrée(s)
-            </p>
-          </div>
-          <Link href="/inscriptions/ajouter">
-            <Button size="md">
-              <IconPlus /> Ajouter
-            </Button>
-          </Link>
-        </div>
-
+      <div className="flex-1 p-4 sm:p-6">
         <InscriptionsClient
           appUrl={appUrl}
+          totalCount={inscriptions.length}
           inscriptions={inscriptions.map((i) => ({
             ...i,
             statut: i.statut as "EN_ATTENTE" | "VALIDEE" | "REJETEE",
@@ -53,13 +38,5 @@ export default async function InscriptionsPage() {
         />
       </div>
     </>
-  );
-}
-
-function IconPlus() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
   );
 }

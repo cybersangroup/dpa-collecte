@@ -381,27 +381,29 @@ export function FormationsClient({ formations: initial, isAdmin, appUrl }: Props
           </div>
         </div>
 
-        {/* ── Recherche & filtres ── */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher une formation…"
-              className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
-          </div>
-          <select value={filterCategorie} onChange={(e) => setFilterCategorie(e.target.value)} className={inpCls}>
+      {/* ── Recherche & filtres ── */}
+      <div className="space-y-2">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher une formation…"
+            className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={filterCategorie} onChange={(e) => setFilterCategorie(e.target.value)} className={inpCls + " flex-1 min-w-[120px]"}>
             <option value="ALL">Toutes catégories</option>
             <option value="ADULTE">Adulte</option>
             <option value="ENFANT">Enfant</option>
           </select>
-          <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)} className={inpCls}>
-            <option value="ALL">Tous les statuts</option>
+          <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)} className={inpCls + " flex-1 min-w-[120px]"}>
+            <option value="ALL">Tous statuts</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </div>
+      </div>
 
         {/* ── Actions groupées ── */}
         {isAdmin && filteredFormations.length > 0 && (
