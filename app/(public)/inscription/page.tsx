@@ -1,9 +1,6 @@
 import { Logo } from "@/components/branding/Logo";
 import { InscriptionForm } from "@/components/forms/InscriptionForm";
-import { InscriptionQRCode } from "@/components/inscription/InscriptionQRCode";
 import { db } from "@/lib/db";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +40,6 @@ export default async function InscriptionPage() {
                 categorie: f.categorie as "ENFANT" | "ADULTE",
               }))}
             />
-          </div>
-
-          {/* QR code de partage */}
-          <div className="rounded-2xl border border-border bg-card shadow-sm">
-            <InscriptionQRCode appUrl={`${APP_URL}/inscription`} />
           </div>
         </div>
       </main>

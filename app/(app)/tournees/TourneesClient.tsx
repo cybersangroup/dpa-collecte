@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/Button";
@@ -208,15 +208,31 @@ export function TourneesClient({
   tournees: Tournee[];
   publicAppUrl: string;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [search, setSearch]           = useState("");
+  const [filterVille, setFilterVille] = useState("ALL");
+  const [filterStatut, setFilterStatut] = useState("ALL");
+  const [selected, setSelected]       = useState<Set<string>>(new Set());
+  const [toast, setToast]             = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<{ titre: string; qrUrl: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition]  = useTransition();
 
-  // Calcul de "now" côté client uniquement pour éviter l'hydration mismatch #418
+  // Calcul de "now" côté client uniquement pour éviter l'hydration mismatch
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return tournees.filter((t) => {
+      const matchSearch = !q || t.titre.toLowerCase().includes(q) || t.city.nom.toLowerCase().includes(q);
+      const matchVille  = filterVille === "ALL" || t.city.code === filterVille;
+      const isActive    = now ? t.qrIsActive && new Date(t.endsAt) > now : t.qrIsActive;
+      const matchStatut = filterStatut === "ALL"
+        || (filterStatut === "ACTIVE"  && isActive)
+        || (filterStatut === "EXPIREE" && !isActive);
+      return matchSearch && matchVille && matchStatut;
+    });
+  }, [tournees, search, filterVille, filterStatut, now]);
 
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -227,10 +243,10 @@ export function TourneesClient({
   }
 
   function toggleAll() {
-    if (selected.size === tournees.length) {
+    if (selected.size === filtered.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(tournees.map((t) => t.id)));
+      setSelected(new Set(filtered.map((t) => t.id)));
     }
   }
 
@@ -255,8 +271,9 @@ export function TourneesClient({
     });
   }
 
-  const allSelected = selected.size === tournees.length && tournees.length > 0;
-  const someSelected = selected.size > 0 && !allSelected;
+  const allSelected  = filtered.length > 0 && filtered.every((t) => selected.has(t.id));
+  const someSelected = selected.size > 0;
+  const selClass = "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
 
   return (
     <>
@@ -279,6 +296,32 @@ export function TourneesClient({
       )}
 
       <div className="space-y-4">
+        {/* Barre de recherche + filtres */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher par titre ou ville…"
+              className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
+          </div>
+          <select value={filterVille} onChange={(e) => setFilterVille(e.target.value)} className={selClass}>
+            <option value="ALL">Toutes les villes</option>
+            <option value="DKR">DKR</option>
+            <option value="DJIB">DJIB</option>
+          </select>
+          <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)} className={selClass}>
+            <option value="ALL">Tous les statuts</option>
+            <option value="ACTIVE">Active</option>
+            <option value="EXPIREE">Expirée</option>
+          </select>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} tournée(s){filtered.length !== tournees.length && ` sur ${tournees.length}`}
+        </p>
+
         {/* Toast */}
         {toast && (
           <div
@@ -300,13 +343,13 @@ export function TourneesClient({
         )}
 
         {/* Barre de sélection */}
-        {tournees.length > 0 && (
+        {filtered.length > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={allSelected}
-                ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
                 onChange={toggleAll}
                 className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
               />
@@ -335,7 +378,7 @@ export function TourneesClient({
 
         {/* Liste */}
         <div className="grid gap-4">
-          {tournees.map((t) => {
+          {filtered.map((t) => {
             // now peut être null avant hydration — on considère la tournée comme active par défaut
             const isActive = now
               ? t.qrIsActive && new Date(t.endsAt) > now

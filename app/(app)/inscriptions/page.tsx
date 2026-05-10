@@ -3,12 +3,15 @@ import { unstable_noStore as noStore } from "next/cache";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { db } from "@/lib/db";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { InscriptionsClient } from "./InscriptionsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function InscriptionsPage() {
   noStore();
+
+  const appUrl = getPublicAppUrl();
 
   const inscriptions = await db.inscription.findMany({
     include: {
@@ -40,6 +43,7 @@ export default async function InscriptionsPage() {
         </div>
 
         <InscriptionsClient
+          appUrl={appUrl}
           inscriptions={inscriptions.map((i) => ({
             ...i,
             statut: i.statut as "EN_ATTENTE" | "VALIDEE" | "REJETEE",
@@ -47,11 +51,6 @@ export default async function InscriptionsPage() {
             formation: { ...i.formation, categorie: i.formation.categorie as string },
           }))}
         />
-
-        <div className="text-xs text-muted-foreground text-center pt-2">
-          Formulaire public :{" "}
-          <Link href="/inscription" target="_blank" className="text-primary underline underline-offset-2">/inscription</Link>
-        </div>
       </div>
     </>
   );
