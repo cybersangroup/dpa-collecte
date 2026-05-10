@@ -1,6 +1,3 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -8,30 +5,6 @@ import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 
-// ─── Hook dark mode ────────────────────────────────────────────────────────
-function useDarkMode() {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  const toggle = () => {
-    const next = !isDark;
-    if (next) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("dpa-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("dpa-theme", "light");
-    }
-    setIsDark(next);
-  };
-
-  return { isDark, toggle };
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 export default function ParametresPage() {
   return (
     <>
@@ -137,10 +110,7 @@ export default function ParametresPage() {
   );
 }
 
-// Client component pour les préférences (accès localStorage)
 function PreferencesCard() {
-  const { isDark, toggle } = useDarkMode();
-
   return (
     <Card>
       <CardHeader>
@@ -150,12 +120,6 @@ function PreferencesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="divide-y divide-border">
-        <ToggleRow
-          title="Mode sombre"
-          description="Passe l'interface en thème sombre pour réduire la fatigue visuelle"
-          checked={isDark}
-          onChange={toggle}
-        />
         <ToggleRow
           title="Notifications de tournée"
           description="Recevoir un récapitulatif à la fin de chaque tournée"

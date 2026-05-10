@@ -1,4 +1,5 @@
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export function Topbar({ title }: { title: string }) {
   return (
@@ -6,6 +7,7 @@ export function Topbar({ title }: { title: string }) {
       <h1 className="text-base sm:text-lg font-semibold tracking-tight flex-1 truncate">
         {title}
       </h1>
+      <ThemeToggle />
       <NotificationBell />
     </header>
   );
