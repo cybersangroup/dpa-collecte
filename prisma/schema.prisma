@@ -167,10 +167,17 @@ model FormationShift {
   @@index([formationId])
 }
 
+enum StatutInscription {
+  EN_ATTENTE
+  VALIDEE
+  REJETEE
+}
+
 model Inscription {
   id            String              @id @default(cuid())
   type          TypeInscrit
-  nomParent     String?             // Nom du parent si type=PARENT
+  statut        StatutInscription   @default(EN_ATTENTE)
+  nomParent     String?             // Nom du contact (adulte ou parent)
   telephone     String
   countryCode   String?
   adresse       String?

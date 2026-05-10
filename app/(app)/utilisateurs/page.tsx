@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -34,9 +35,11 @@ export default async function UtilisateursPage() {
             </p>
           </div>
 
-          <Button size="md" type="button" disabled>
-            <IconPlus /> Inviter un opérateur
-          </Button>
+          <Link href="/utilisateurs/ajouter">
+            <Button size="md">
+              <IconPlus /> Ajouter un opérateur
+            </Button>
+          </Link>
         </div>
 
         {membres.length === 0 ? (

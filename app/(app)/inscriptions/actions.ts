@@ -180,6 +180,24 @@ export async function toggleFormationActif(id: string, actif: boolean): Promise<
   revalidatePath("/formations");
 }
 
+// ─── Statut inscription ──────────────────────────────────────────────────────
+
+export async function updateStatutInscription(
+  id: string,
+  statut: "VALIDEE" | "REJETEE" | "EN_ATTENTE",
+): Promise<{ error?: string }> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { error: "Non authentifié." };
+    await db.inscription.update({ where: { id }, data: { statut } });
+    revalidatePath("/inscriptions");
+    return {};
+  } catch (err) {
+    console.error("[updateStatutInscription]", err);
+    return { error: "Impossible de mettre à jour le statut." };
+  }
+}
+
 export async function deleteFormation(id: string): Promise<{ error?: string }> {
   try {
     await requireAdmin();
