@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -5,6 +8,30 @@ import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 
+// ─── Hook dark mode ────────────────────────────────────────────────────────
+function useDarkMode() {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggle = () => {
+    const next = !isDark;
+    if (next) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("dpa-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("dpa-theme", "light");
+    }
+    setIsDark(next);
+  };
+
+  return { isDark, toggle };
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 export default function ParametresPage() {
   return (
     <>
@@ -89,35 +116,7 @@ export default function ParametresPage() {
           </Card>
 
           {/* Préférences */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Préférences</CardTitle>
-              <CardDescription>
-                Personnalisez votre expérience DPA Collecte
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y divide-border">
-              <ToggleRow
-                title="Mode sombre"
-                description="Adapte automatiquement l'interface aux conditions de luminosité"
-              />
-              <ToggleRow
-                title="Notifications de tournée"
-                description="Recevoir un récapitulatif à la fin de chaque tournée"
-                defaultOn
-              />
-              <ToggleRow
-                title="Mode hors-ligne"
-                description="Active la sauvegarde locale en cas de perte de réseau"
-                defaultOn
-              />
-              <SelectRow
-                title="Langue"
-                description="Langue d'affichage de l'interface"
-                value="Français"
-              />
-            </CardContent>
-          </Card>
+          <PreferencesCard />
 
           {/* À propos */}
           <Card>
@@ -126,7 +125,7 @@ export default function ParametresPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <p>
-                DPA Collecte . version 0.1.0{" "}
+                DPA Collecte · version 0.1.0{" "}
                 <span className="text-muted-foreground/60">|</span>{" "}
                 <span className="text-foreground">© Equipe Tech Cybersan</span>
               </p>
@@ -138,14 +137,55 @@ export default function ParametresPage() {
   );
 }
 
+// Client component pour les préférences (accès localStorage)
+function PreferencesCard() {
+  const { isDark, toggle } = useDarkMode();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Préférences</CardTitle>
+        <CardDescription>
+          Personnalisez votre expérience DPA Collecte
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        <ToggleRow
+          title="Mode sombre"
+          description="Passe l'interface en thème sombre pour réduire la fatigue visuelle"
+          checked={isDark}
+          onChange={toggle}
+        />
+        <ToggleRow
+          title="Notifications de tournée"
+          description="Recevoir un récapitulatif à la fin de chaque tournée"
+          checked
+        />
+        <ToggleRow
+          title="Mode hors-ligne"
+          description="Active la sauvegarde locale en cas de perte de réseau"
+          checked
+        />
+        <SelectRow
+          title="Langue"
+          description="Langue d'affichage de l'interface"
+          value="Français"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 function ToggleRow({
   title,
   description,
-  defaultOn,
+  checked,
+  onChange,
 }: {
   title: string;
   description: string;
-  defaultOn?: boolean;
+  checked?: boolean;
+  onChange?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
@@ -154,7 +194,13 @@ function ToggleRow({
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
       <label className="relative inline-flex shrink-0 cursor-pointer">
-        <input type="checkbox" className="sr-only peer" defaultChecked={defaultOn} />
+        <input
+          type="checkbox"
+          className="sr-only peer"
+          checked={checked}
+          onChange={onChange ?? (() => {})}
+          readOnly={!onChange}
+        />
         <span className="h-6 w-11 rounded-full bg-secondary border border-border peer-checked:bg-primary peer-checked:border-primary transition-colors" />
         <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
       </label>
