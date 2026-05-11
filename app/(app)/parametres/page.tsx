@@ -1,5 +1,7 @@
 "use client";
 
+import { signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Topbar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -8,6 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/Badge";
 
 export default function ParametresPage() {
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  function initialsFromName(name?: string | null) {
+    if (!name) return "?";
+    return name.trim().split(/\s+/).filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  }
+
   return (
     <>
       <Topbar title="Paramètres" />
@@ -104,6 +114,46 @@ export default function ParametresPage() {
                 <span className="text-muted-foreground/60">|</span>{" "}
                 <span className="text-foreground">© Equipe Tech Cybersan</span>
               </p>
+            </CardContent>
+          </Card>
+
+          {/* ── Session & déconnexion — toujours visible, essentiel sur mobile ── */}
+          <Card className="border-destructive/30">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                {/* Avatar */}
+                <div className="h-12 w-12 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
+                  {initialsFromName(user?.name)}
+                </div>
+                {/* Infos */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate">{user?.name ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground truncate">@{(user as { username?: string })?.username ?? "—"}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <Badge variant={user?.role === "ADMIN" ? "primary" : "default"}>
+                      {user?.role === "ADMIN" ? "Admin" : "Opérateur"}
+                    </Badge>
+                    {(user as { cityCode?: string })?.cityCode && (
+                      <Badge variant="outline">{(user as { cityCode?: string }).cityCode}</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: `${window.location.origin}/connexion` })}
+                  className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Se déconnecter
+                </button>
+              </div>
             </CardContent>
           </Card>
         </div>
