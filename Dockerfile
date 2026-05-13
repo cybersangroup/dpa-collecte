@@ -11,9 +11,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Variables publiques nécessaires au build (pas de valeurs sensibles ici)
+# Variables nécessaires au build
 ARG NEXTAUTH_URL
 ARG NEXT_PUBLIC_APP_URL
+# DATABASE_URL factice pour satisfaire Prisma à la compilation (pas de connexion réelle)
+ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
+ENV DATABASE_URL=$DATABASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
