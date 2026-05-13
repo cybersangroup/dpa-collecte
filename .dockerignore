@@ -1,11 +1,31 @@
+# Contrôle de version
 .git
-.next
-node_modules
-npm-debug.log
-Dockerfile
-docker-compose.yml
 .gitignore
-README.md
+
+# Build Next.js (régénéré dans le conteneur)
+.next
+
+# Dépendances (réinstallées proprement via npm ci)
+node_modules
+
+# Fichiers d'environnement (ne jamais embarquer dans l'image)
 .env
+.env.*
 .env.local
-.env.*.local
+.env.production
+.env.production.local
+
+# Logs
+npm-debug.log*
+*.log
+
+# Documentation & config locale
+README.md
+DEPLOIEMENT_VPS.md
+docker-compose.yml
+docker-compose.prod.yml
+
+# Fichiers IDE
+.vscode
+.cursor
+*.swp

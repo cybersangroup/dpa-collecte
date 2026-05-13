@@ -1,0 +1,68 @@
+name: dpa-collecte
+
+services:
+
+  # ── Base de données PostgreSQL ───────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       dpa_collecte
+      POSTGRES_USER:     dpa_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [dpa_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dpa_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Stockage MinIO (reçus de paiement) ──────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      # API S3 — Nginx Proxy Manager proxie vers ce port pour les fichiers publics
+      - "127.0.0.1:9000:9000"
+      # Console admin — accès local uniquement (à fermer après la configuration initiale)
+      - "127.0.0.1:9001:9001"
+    networks: [dpa_net]
+
+  # ── Application Next.js ──────────────────────────────────────────────────────
+  app:
+    image: ghcr.io/cybersangroup/dpa-collecte:latest
+    restart: unless-stopped
+    depends_on:
+      db:    { condition: service_healthy }
+      minio: { condition: service_started }
+    environment:
+      DATABASE_URL:        postgresql://dpa_user:${POSTGRES_PASSWORD}@db:5432/dpa_collecte
+      DIRECT_URL:          postgresql://dpa_user:${POSTGRES_PASSWORD}@db:5432/dpa_collecte
+      NEXTAUTH_URL:        https://${DOMAIN}
+      NEXTAUTH_SECRET:     ${NEXTAUTH_SECRET}
+      NEXT_PUBLIC_APP_URL: https://${DOMAIN}
+      MINIO_ENDPOINT:      http://minio:9000
+      MINIO_ACCESS_KEY:    ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY:    ${MINIO_SECRET_KEY}
+      MINIO_BUCKET:        recus
+      MINIO_PUBLIC_URL:    https://storage.${DOMAIN}
+    ports:
+      # Exposé uniquement sur localhost — Nginx Proxy Manager proxie vers ce port
+      - "127.0.0.1:3000:3000"
+    networks: [dpa_net]
+
+volumes:
+  pgdata:     # Données PostgreSQL (critique — sauvegarder régulièrement)
+  minio_data: # Fichiers MinIO, reçus de paiement (critique)
+
+networks:
+  dpa_net:
+    driver: bridge

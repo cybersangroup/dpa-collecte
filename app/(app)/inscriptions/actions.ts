@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { put } from "@vercel/blob";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -18,22 +18,48 @@ export type FormationFormState =
   | { status: "error"; message: string }
   | { status: "success" };
 
+// ─── Client MinIO (compatible S3) ────────────────────────────────────────────
+
+function getS3Client() {
+  return new S3Client({
+    endpoint:    process.env.MINIO_ENDPOINT,   // ex. http://minio:9000
+    region:      "us-east-1",                  // valeur arbitraire pour MinIO
+    credentials: {
+      accessKeyId:     process.env.MINIO_ACCESS_KEY ?? "",
+      secretAccessKey: process.env.MINIO_SECRET_KEY ?? "",
+    },
+    forcePathStyle: true,  // obligatoire avec MinIO
+  });
+}
+
 // ─── Upload reçu ─────────────────────────────────────────────────────────────
 
 async function uploadRecu(file: File | null): Promise<string | null> {
   if (!file || file.size === 0) return null;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.warn("[uploadRecu] BLOB_READ_WRITE_TOKEN non configuré — reçu non uploadé.");
+
+  // En développement local sans MinIO configuré, on skippe silencieusement
+  if (!process.env.MINIO_ENDPOINT || !process.env.MINIO_ACCESS_KEY) {
+    console.warn("[uploadRecu] Variables MinIO non configurées — reçu non uploadé.");
     return null;
   }
-  if (file.size > 5 * 1024 * 1024) throw new Error("Le reçu ne doit pas dépasser 5 Mo.");
+
+  if (file.size > 10 * 1024 * 1024) throw new Error("Le reçu ne doit pas dépasser 10 Mo.");
   if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
     throw new Error("Le reçu doit être une image (JPG, PNG, WEBP) ou un PDF.");
   }
-  const ext  = file.name.split(".").pop() ?? "jpg";
-  const name = `recus/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const blob = await put(name, file, { access: "public" });
-  return blob.url;
+
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const key = `recus/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const body = Buffer.from(await file.arrayBuffer());
+
+  await getS3Client().send(new PutObjectCommand({
+    Bucket:      process.env.MINIO_BUCKET ?? "recus",
+    Key:         key,
+    Body:        body,
+    ContentType: file.type,
+  }));
+
+  return `${process.env.MINIO_PUBLIC_URL}/${process.env.MINIO_BUCKET ?? "recus"}/${key}`;
 }
 
 // ─── Inscription ─────────────────────────────────────────────────────────────
