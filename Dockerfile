@@ -18,6 +18,7 @@ ARG NEXT_PUBLIC_APP_URL
 ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV DATABASE_URL=$DATABASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=2048
 
 RUN npm run build
 
