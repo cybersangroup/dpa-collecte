@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { QrPreview } from "@/components/qr/QrPreview";
 import { cn } from "@/lib/cn";
-import { deleteCampaigns } from "./actions";
+import { deleteCampaigns, stopCampaign, extendCampaign } from "./actions";
 
 type City = { code: string; nom: string };
 
@@ -201,6 +201,45 @@ function ConfirmModal({
   );
 }
 
+/* ─── Modal de confirmation simple ─── */
+function SimpleConfirmModal({
+  title,
+  body,
+  confirmLabel,
+  confirmVariant,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  confirmVariant: "destructive" | "primary";
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} aria-hidden />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl p-6 space-y-4">
+        <div>
+          <p className="font-semibold text-foreground">{title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={onCancel}>Annuler</Button>
+          <Button variant={confirmVariant} size="sm" onClick={onConfirm}>{confirmLabel}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TourneesClient({
   tournees,
   publicAppUrl,
@@ -216,6 +255,11 @@ export function TourneesClient({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<{ titre: string; qrUrl: string } | null>(null);
   const [isPending, startTransition]  = useTransition();
+  // Prolonger
+  const [extendTarget, setExtendTarget] = useState<{ id: string; titre: string; endsAt: Date } | null>(null);
+  const [extendDate, setExtendDate]     = useState("");
+  // Arrêter
+  const [stopTarget, setStopTarget]     = useState<{ id: string; titre: string } | null>(null);
 
   // Calcul de "now" côté client uniquement pour éviter l'hydration mismatch
   const [now, setNow] = useState<Date | null>(null);
@@ -271,6 +315,35 @@ export function TourneesClient({
     });
   }
 
+  function handleStop() {
+    if (!stopTarget) return;
+    setStopTarget(null);
+    startTransition(async () => {
+      const res = await stopCampaign(stopTarget.id);
+      if (res.ok) {
+        setToast({ type: "success", message: "Tournée arrêtée. Le QR code n'accepte plus de nouvelles inscriptions." });
+        setTimeout(() => window.location.assign("/tournees"), 900);
+      } else {
+        setToast({ type: "error", message: res.message ?? "Erreur inconnue." });
+      }
+    });
+  }
+
+  function handleExtend() {
+    if (!extendTarget || !extendDate) return;
+    const id = extendTarget.id;
+    setExtendTarget(null);
+    startTransition(async () => {
+      const res = await extendCampaign(id, extendDate);
+      if (res.ok) {
+        setToast({ type: "success", message: "Tournée prolongée avec succès." });
+        setTimeout(() => window.location.assign("/tournees"), 900);
+      } else {
+        setToast({ type: "error", message: res.message ?? "Erreur inconnue." });
+      }
+    });
+  }
+
   const allSelected  = filtered.length > 0 && filtered.every((t) => selected.has(t.id));
   const someSelected = selected.size > 0;
   const selClass = "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
@@ -293,6 +366,50 @@ export function TourneesClient({
           onConfirm={confirmDelete}
           onCancel={() => setConfirmOpen(false)}
         />
+      )}
+
+      {/* Modal arrêter la tournée */}
+      {stopTarget && (
+        <SimpleConfirmModal
+          title="Arrêter la tournée ?"
+          body={`Le QR code de « ${stopTarget.titre} » sera désactivé immédiatement et n'acceptera plus de nouvelles inscriptions.`}
+          confirmLabel="Arrêter"
+          confirmVariant="destructive"
+          onConfirm={handleStop}
+          onCancel={() => setStopTarget(null)}
+        />
+      )}
+
+      {/* Modal prolonger la tournée */}
+      {extendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setExtendTarget(null)} aria-hidden />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl p-6 space-y-4">
+            <div>
+              <h3 className="font-semibold text-foreground">Prolonger la tournée</h3>
+              <p className="text-sm text-muted-foreground mt-0.5 truncate">{extendTarget.titre}</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nouvelle date de fin</label>
+              <input
+                type="datetime-local"
+                value={extendDate}
+                onChange={(e) => setExtendDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <p className="text-xs text-muted-foreground">
+                Expiration actuelle : {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(extendTarget.endsAt))}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setExtendTarget(null)}>Annuler</Button>
+              <Button size="sm" disabled={!extendDate || isPending} onClick={handleExtend}>
+                {isPending ? "Enregistrement…" : "Prolonger"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="space-y-4">
@@ -450,6 +567,16 @@ export function TourneesClient({
                     <Button variant="outline" size="sm" onClick={() => copyLink(qrUrl)}>
                       <IconCopy /> Copier le lien
                     </Button>
+                    <Button variant="outline" size="sm"
+                      onClick={() => { setExtendDate(""); setExtendTarget({ id: t.id, titre: t.titre, endsAt: t.endsAt }); }}>
+                      <IconCalendarPlus /> Prolonger
+                    </Button>
+                    {isActive && (
+                      <Button variant="destructive" size="sm"
+                        onClick={() => setStopTarget({ id: t.id, titre: t.titre })}>
+                        <IconStop /> Arrêter
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -504,6 +631,25 @@ function IconCopy() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="9" y="9" width="13" height="13" rx="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+function IconCalendarPlus() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="12" y1="14" x2="12" y2="18" />
+      <line x1="10" y1="16" x2="14" y2="16" />
+    </svg>
+  );
+}
+function IconStop() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
     </svg>
   );
 }

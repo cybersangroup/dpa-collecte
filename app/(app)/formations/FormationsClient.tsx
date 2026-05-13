@@ -2,7 +2,6 @@
 
 import { useActionState, useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { QRCodeCanvas } from "qrcode.react";
 import {
   createFormation,
   updateFormation,
@@ -154,67 +153,6 @@ function FormationModal({ initial, onSuccess, onClose }: {
   );
 }
 
-// ─── Modal QR code inscription publique ──────────────────────────────────────
-
-function QRModal({ url, onClose }: { url: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  };
-
-  const handleDownload = () => {
-    const canvas = document.getElementById("form-qr") as HTMLCanvasElement | null;
-    if (!canvas) return;
-    const a = document.createElement("a"); a.download = "dpa-inscription-qr.png"; a.href = canvas.toDataURL("image/png"); a.click();
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) { try { await navigator.share({ title: "Inscription DPA", url }); } catch {} } else { handleCopy(); }
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">QR code — Formulaire d&apos;inscription</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex justify-center">
-          <div className="p-3 rounded-xl bg-white shadow-sm">
-            <QRCodeCanvas id="form-qr" value={url} size={180} level="M" />
-          </div>
-        </div>
-        <div className="rounded-lg bg-secondary/50 border border-border px-3 py-2 text-xs font-mono text-muted-foreground break-all">{url}</div>
-        <div className="grid grid-cols-1 gap-2">
-          <Button size="md" className="w-full gap-2" onClick={handleShare}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
-            </svg>
-            Partager le lien
-          </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopy}>{copied ? "✓ Copié !" : "Copier le lien"}</Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>Télécharger PNG</Button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
 
 // ─── Gestion des créneaux ─────────────────────────────────────────────────────
 
@@ -285,13 +223,12 @@ function ShiftManager({ formation, isAdmin }: { formation: Formation; isAdmin: b
 
 // ─── Composant principal ─────────────────────────────────────────────────────
 
-export function FormationsClient({ formations: initial, isAdmin, appUrl }: Props) {
+export function FormationsClient({ formations: initial, isAdmin }: Props) {
   const [formations, setFormations]   = useState(initial);
   const [showCreate, setShowCreate]   = useState(false);
   const [editTarget, setEditTarget]   = useState<Formation | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [toggling, setToggling]       = useState<string | null>(null);
-  const [showQR, setShowQR]           = useState(false);
   const [selected, setSelected]       = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -350,12 +287,10 @@ export function FormationsClient({ formations: initial, isAdmin, appUrl }: Props
   const toggleAll = () => { if (allSelected) setSelected(new Set()); else setSelected(new Set(filteredFormations.map((f) => f.id))); };
 
   const inpCls = "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
-  const inscriptionUrl = `${appUrl}/inscription`;
 
   return (
     <>
       {/* Modals */}
-      {showQR && <QRModal url={inscriptionUrl} onClose={() => setShowQR(false)} />}
       {showCreate && <FormationModal onSuccess={reload} onClose={() => setShowCreate(false)} />}
       {editTarget && <FormationModal initial={editTarget} onSuccess={reload} onClose={() => setEditTarget(null)} />}
 
@@ -370,9 +305,6 @@ export function FormationsClient({ formations: initial, isAdmin, appUrl }: Props
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="md" onClick={() => setShowQR(true)}>
-              <IconQr /> Partager QR
-            </Button>
             {isAdmin && (
               <Button size="md" onClick={() => setShowCreate(true)}>
                 <IconPlus /> Ajouter une formation
@@ -500,5 +432,4 @@ export function FormationsClient({ formations: initial, isAdmin, appUrl }: Props
 }
 
 function IconPlus() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>; }
-function IconQr()   { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3" /><path d="M21 14v0" /><path d="M14 21h7" /><path d="M21 17v4" /></svg>; }
 function IconTrash(){ return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>; }

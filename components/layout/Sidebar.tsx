@@ -22,8 +22,8 @@ const items: NavItem[] = [
     icon: <IconDashboard />,
   },
   {
-    href: "/etudiants",
-    label: "Étudiants",
+    href: "/collectes-donnees",
+    label: "Collectes",
     icon: <IconUsers />,
   },
   {

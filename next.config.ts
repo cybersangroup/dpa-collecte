@@ -24,6 +24,12 @@ const allowedDevOrigins = Array.from(
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins,
+  async redirects() {
+    return [
+      { source: "/etudiants", destination: "/collectes-donnees", permanent: true },
+      { source: "/etudiants/:path*", destination: "/collectes-donnees/:path*", permanent: true },
+    ];
+  },
 };
 
 export default withPWA({

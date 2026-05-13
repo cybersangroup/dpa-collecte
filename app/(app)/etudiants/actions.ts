@@ -94,7 +94,7 @@ export async function createStudent(
       },
     });
 
-    revalidatePath("/etudiants");
+    revalidatePath("/collectes-donnees");
     return { status: "success" };
   } catch (err) {
     console.error("[createStudent]", err);

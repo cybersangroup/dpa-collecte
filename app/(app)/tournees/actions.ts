@@ -76,6 +76,53 @@ export async function createCampaign(
   }
 }
 
+export async function stopCampaign(id: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return { ok: false, message: "Non authentifié." };
+
+    await db.campaign.update({
+      where: { id },
+      data:  { qrIsActive: false },
+    });
+
+    revalidatePath("/tournees");
+    return { ok: true };
+  } catch (err) {
+    console.error("[stopCampaign]", err);
+    return { ok: false, message: "Impossible d'arrêter la tournée." };
+  }
+}
+
+export async function extendCampaign(
+  id: string,
+  newEndsAt: string,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return { ok: false, message: "Non authentifié." };
+
+    const endsAt = new Date(newEndsAt);
+    if (isNaN(endsAt.getTime())) {
+      return { ok: false, message: "Date invalide." };
+    }
+    if (endsAt <= new Date()) {
+      return { ok: false, message: "La nouvelle date doit être dans le futur." };
+    }
+
+    await db.campaign.update({
+      where: { id },
+      data:  { endsAt, qrIsActive: true },
+    });
+
+    revalidatePath("/tournees");
+    return { ok: true };
+  } catch (err) {
+    console.error("[extendCampaign]", err);
+    return { ok: false, message: "Impossible de prolonger la tournée." };
+  }
+}
+
 export async function deleteCampaigns(ids: string[]): Promise<{ ok: boolean; message?: string }> {
   if (!ids || ids.length === 0) return { ok: false, message: "Aucune tournée sélectionnée." };
 

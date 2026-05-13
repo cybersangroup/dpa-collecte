@@ -67,7 +67,7 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
       const t = setTimeout(() => setShowWaPopup(true), 1000);
       return () => clearTimeout(t);
     } else {
-      const t = setTimeout(() => window.location.assign("/etudiants"), 1500);
+      const t = setTimeout(() => window.location.assign("/collectes-donnees"), 1500);
       return () => clearTimeout(t);
     }
   }, [state.status, isQr]);
@@ -163,7 +163,6 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
               <option value="">— Sélectionner —</option>
               <option value="M">Masculin</option>
               <option value="F">Féminin</option>
-              <option value="Autre">Autre</option>
             </select>
           </div>
           <div className="space-y-2">
