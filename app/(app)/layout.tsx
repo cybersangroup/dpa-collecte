@@ -2,6 +2,8 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { UpdatePrompt } from "@/components/pwa/UpdatePrompt";
 
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
