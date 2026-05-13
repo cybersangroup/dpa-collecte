@@ -260,6 +260,12 @@ export function InscriptionsClient({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="md" onClick={() => exportCsvInscriptions(filtered)}>
+              <IconDownload /> CSV
+            </Button>
+            <Button variant="outline" size="md" onClick={() => exportExcelInscriptions(filtered)}>
+              <IconDownload /> Excel
+            </Button>
             <Button variant="outline" size="md" onClick={() => setShowQR(true)}>
               <IconQr /> Partager QR
             </Button>
@@ -387,6 +393,92 @@ export function InscriptionsClient({
         </div>
       </div>
     </>
+  );
+}
+
+// ─── Export CSV ──────────────────────────────────────────────────────────────
+
+function exportCsvInscriptions(inscriptions: Inscription[]) {
+  const sep = ";";
+  const header = ["Statut", "Type", "Nom/Parent", "Téléphone", "Adresse", "Formation", "Catégorie", "Montant", "Devise", "Nb enfants", "Noms enfants", "Reçu", "Ajouté par", "Date"].join(sep);
+  const rows = inscriptions.map((i) => [
+    i.statut === "EN_ATTENTE" ? "En attente" : i.statut === "VALIDEE" ? "Validée" : "Rejetée",
+    i.type === "ADULTE" ? "Adulte" : "Parent",
+    i.nomParent ?? "",
+    `${i.countryCode ?? ""}${i.telephone}`,
+    i.adresse ?? "",
+    i.formation.nom,
+    i.formation.categorie === "ENFANT" ? "Enfant" : "Adulte",
+    i.formation.prix ?? "",
+    i.formation.devise,
+    String(i.enfants.length),
+    i.enfants.map((e) => e.nom).join(", "),
+    i.recuUrl ?? "",
+    i.addedBy?.nomComplet ?? "",
+    new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(i.createdAt)),
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(sep));
+
+  const bom = "\uFEFF";
+  const content = bom + [header, ...rows].join("\r\n");
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `inscriptions-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportExcelInscriptions(inscriptions: Inscription[]) {
+  const cols = ["Statut", "Type", "Nom/Parent", "Téléphone", "Adresse", "Formation", "Catégorie", "Montant", "Devise", "Nb enfants", "Noms enfants", "Reçu", "Ajouté par", "Date"];
+  const rows = inscriptions.map((i) => [
+    i.statut === "EN_ATTENTE" ? "En attente" : i.statut === "VALIDEE" ? "Validée" : "Rejetée",
+    i.type === "ADULTE" ? "Adulte" : "Parent",
+    i.nomParent ?? "",
+    `${i.countryCode ?? ""}${i.telephone}`,
+    i.adresse ?? "",
+    i.formation.nom,
+    i.formation.categorie === "ENFANT" ? "Enfant" : "Adulte",
+    i.formation.prix ?? "",
+    i.formation.devise,
+    String(i.enfants.length),
+    i.enfants.map((e) => e.nom).join(", "),
+    i.recuUrl ?? "",
+    i.addedBy?.nomComplet ?? "",
+    new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(i.createdAt)),
+  ]);
+
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const makeRow = (vals: string[], style?: string) =>
+    `<Row${style ? ` ss:StyleID="${style}"` : ""}>${vals.map((v) => `<Cell><Data ss:Type="String">${esc(String(v))}</Data></Cell>`).join("")}</Row>`;
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Styles><Style ss:ID="h"><Font ss:Bold="1"/><Interior ss:Color="#EEF2FF" ss:Pattern="Solid"/></Style></Styles>
+  <Worksheet ss:Name="Inscriptions">
+    <Table>
+      ${makeRow(cols, "h")}
+      ${rows.map((r) => makeRow(r)).join("\n      ")}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+
+  const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `inscriptions-${new Date().toISOString().slice(0, 10)}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function IconDownload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
   );
 }
 

@@ -130,9 +130,11 @@ const selClass = "rounded-lg border border-input bg-background px-3 py-2 text-sm
 export function CollectesClient({
   students,
   campaigns,
+  totalCount,
 }: {
   students: Student[];
   campaigns: Campaign[];
+  totalCount: number;
 }) {
   const [search, setSearch]               = useState("");
   const [filterProfil, setFilterProfil]   = useState("ALL");
@@ -186,6 +188,27 @@ export function CollectesClient({
 
   return (
     <div className="space-y-4">
+      {/* ── En-tête : titre + actions ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Liste des données collectées</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">{totalCount} enregistrement(s)</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="md" onClick={() => exportCsv(filtered)}>
+            <IconDownload /> CSV
+          </Button>
+          <Button variant="outline" size="md" onClick={() => exportExcel(filtered)}>
+            <IconDownload /> Excel
+          </Button>
+          <a href="/collectes-donnees/ajouter">
+            <Button size="md">
+              <IconPlus /> Ajouter
+            </Button>
+          </a>
+        </div>
+      </div>
+
       {/* Recherche + filtres */}
       <div className="space-y-2">
         <div className="relative">
@@ -330,19 +353,15 @@ export function CollectesClient({
         </div>
       </div>
 
-      {/* Boutons d'export en bas */}
-      {filtered.length > 0 && (
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <span className="text-xs text-muted-foreground mr-1">Exporter :</span>
-          <Button variant="outline" size="sm" onClick={() => exportCsv(filtered)}>
-            <IconDownload /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => exportExcel(filtered)}>
-            <IconDownload /> Excel
-          </Button>
-        </div>
-      )}
     </div>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
   );
 }
 
