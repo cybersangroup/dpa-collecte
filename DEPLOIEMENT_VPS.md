@@ -1,23 +1,29 @@
 # Feuille de route — Déploiement DPA Collecte sur VPS
+## (avec Nginx Proxy Manager)
 
 ## Architecture cible
 
 ```
 Internet (HTTPS)
       │
-  ┌───▼──────────────────────────────┐
-  │  Caddy  (reverse proxy + SSL)    │  ← port 80/443
-  └───┬──────────────────────────────┘
-      │  réseau Docker interne (dpa_net)
-  ┌───┴──────┐  ┌──────────┐  ┌──────────────┐
-  │  Next.js │  │ Postgres │  │   MinIO      │
-  │  :3000   │  │  :5432   │  │  :9000/:9001 │
-  └──────────┘  └──────────┘  └──────────────┘
+  ┌───▼──────────────────────────────────────┐
+  │  Nginx Proxy Manager  (déjà installé)    │  ← ports 80 / 443
+  │  Interface admin sur :81                 │
+  └───┬──────────────────────────────────────┘
+      │  proxy vers l'hôte Docker (127.0.0.1)
+  ┌───┴──────────┐  ┌──────────┐  ┌──────────────┐
+  │  Next.js     │  │ Postgres │  │   MinIO      │
+  │  :3000       │  │  :5432   │  │  :9000/:9001 │
+  └──────────────┘  └──────────┘  └──────────────┘
+         ↑ réseau Docker interne (dpa_net)
 ```
 
+> **Note** : NPM est déjà en place sur le VPS. Les conteneurs DPA exposent leurs ports
+> **uniquement sur l'interface loopback** (`127.0.0.1`) pour que NPM les atteigne sans les
+> exposer à Internet. MinIO n'expose que la console admin (`:9001`) en local.
+
 > **Note architecture** : Next.js est un **monolithe full-stack** (frontend + API Routes +
-> Server Actions + Auth dans le même conteneur). Pas de séparation frontend/backend nécessaire.
-> MinIO remplace Vercel Blob pour le stockage des reçus de paiement.
+> Server Actions + Auth dans le même conteneur). Pas de séparation frontend/backend.
 
 ---
 
@@ -25,16 +31,7 @@ Internet (HTTPS)
 
 ### 1.1 Mode standalone Next.js
 
-Modifier `next.config.js` (ou `.ts`) pour activer la sortie optimisée :
-
-```js
-const nextConfig = {
-  output: "standalone",   // ← ajouter
-  // ... reste de la config
-};
-```
-
-Cela génère un dossier `.next/standalone` ultra-léger, sans `node_modules` entiers.
+`next.config.ts` a déjà `output: "standalone"` — rien à faire.
 
 ---
 
@@ -51,11 +48,16 @@ echo "▶ Starting Next.js..."
 exec node server.js
 ```
 
+Rendre exécutable localement (Linux/Mac) :
+```bash
+chmod +x scripts/docker-entrypoint.sh
+```
+
 ---
 
 ### 1.3 Dockerfile multi-stage
 
-Créer `Dockerfile` à la racine du projet :
+Créer `Dockerfile` à la racine du projet (`collecte-donnees/`) :
 
 ```dockerfile
 # ── Stage 1 : dépendances ─────────────────────────────────
@@ -71,7 +73,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Variables nécessaires au build (pas de valeurs sensibles ici)
 ARG NEXTAUTH_URL
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -87,11 +88,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
-# Copie standalone + assets
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static   ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public         ./public
-COPY --from=builder                        /app/prisma         ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
+COPY --from=builder                        /app/prisma           ./prisma
 COPY --from=deps                           /app/node_modules/.prisma ./node_modules/.prisma
 COPY scripts/docker-entrypoint.sh          ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
@@ -120,11 +120,10 @@ node_modules
 
 ## Phase 2 — Migration stockage images (Vercel Blob → MinIO)
 
-MinIO expose une API compatible S3 — le SDK AWS peut être réutilisé directement.
-
 ### 2.1 Installer le SDK S3
 
 ```bash
+cd collecte-donnees
 npm install @aws-sdk/client-s3
 ```
 
@@ -134,8 +133,8 @@ npm install @aws-sdk/client-s3
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const s3 = new S3Client({
-  endpoint:        process.env.MINIO_ENDPOINT,   // ex. http://minio:9000
-  region:          "us-east-1",                  // valeur quelconque pour MinIO
+  endpoint:    process.env.MINIO_ENDPOINT,   // ex. http://minio:9000
+  region:      "us-east-1",                  // valeur quelconque pour MinIO
   credentials: {
     accessKeyId:     process.env.MINIO_ACCESS_KEY!,
     secretAccessKey: process.env.MINIO_SECRET_KEY!,
@@ -155,7 +154,6 @@ export async function uploadRecu(file: File): Promise<string | null> {
     ContentType: file.type,
   }));
 
-  // URL publique du fichier
   return `${process.env.MINIO_PUBLIC_URL}/${process.env.MINIO_BUCKET}/${key}`;
 }
 ```
@@ -198,7 +196,10 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "127.0.0.1:9001:9001"   # console admin (accès local uniquement)
+      # API MinIO — NPM proxiera vers ce port pour les fichiers publics
+      - "127.0.0.1:9000:9000"
+      # Console admin — accès local uniquement (fermer après config initiale)
+      - "127.0.0.1:9001:9001"
     networks: [dpa_net]
 
   # ── Application Next.js ──────────────────────────────────
@@ -219,63 +220,101 @@ services:
       MINIO_SECRET_KEY:    ${MINIO_SECRET_KEY}
       MINIO_BUCKET:        recus
       MINIO_PUBLIC_URL:    https://storage.${DOMAIN}
-    networks: [dpa_net]
-
-  # ── Reverse proxy + SSL automatique ─────────────────────
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"   # HTTP/3
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      # Exposé uniquement sur localhost — NPM proxiera vers ce port
+      - "127.0.0.1:3000:3000"
     networks: [dpa_net]
 
 volumes:
-  pgdata:       # données PostgreSQL
-  minio_data:   # fichiers MinIO (reçus)
-  caddy_data:   # certificats SSL Let's Encrypt
-  caddy_config: # configuration Caddy
+  pgdata:     # données PostgreSQL
+  minio_data: # fichiers MinIO (reçus)
 
 networks:
   dpa_net:
     driver: bridge
 ```
 
+> **Sécurité** : aucun port n'est ouvert sur `0.0.0.0`. Seul NPM (déjà en place)
+> est exposé sur Internet via les ports 80/443.
+
 ---
 
-## Phase 4 — Domaine & SSL (Caddyfile)
+## Phase 4 — Configuration Nginx Proxy Manager
 
-Créer `Caddyfile` à la racine du projet :
+NPM est déjà installé et accessible via son interface web sur `http://IP_DU_VPS:81`.
 
-```caddyfile
-# Application principale
-dpa.mondomaine.com {
-    reverse_proxy app:3000
-    encode gzip zstd
-}
+### 4.1 Enregistrements DNS (à faire en premier)
 
-# Accès public aux fichiers MinIO (reçus de paiement)
-storage.dpa.mondomaine.com {
-    reverse_proxy minio:9000
-}
+Chez le registrar (ou dans la zone DNS du domaine) :
+
+| Type | Nom              | Valeur    | TTL  |
+|------|------------------|-----------|------|
+| A    | `dpa`            | IP du VPS | 300  |
+| A    | `storage.dpa`    | IP du VPS | 300  |
+
+Remplacer `dpa.mondomaine.com` par le vrai domaine partout.
+
+---
+
+### 4.2 Proxy Host — Application principale
+
+Dans l'interface NPM (`http://IP:81`) :
+
+**Hosts → Proxy Hosts → Add Proxy Host**
+
+| Champ                  | Valeur                     |
+|------------------------|----------------------------|
+| Domain Names           | `dpa.mondomaine.com`       |
+| Scheme                 | `http`                     |
+| Forward Hostname / IP  | `127.0.0.1`                |
+| Forward Port           | `3000`                     |
+| Cache Assets           | ☑ activé                  |
+| Block Common Exploits  | ☑ activé                  |
+| Websockets Support     | ☑ activé                  |
+
+**Onglet SSL :**
+
+| Champ                  | Valeur                     |
+|------------------------|----------------------------|
+| SSL Certificate        | Request a new SSL Certificate |
+| Force SSL              | ☑ activé                  |
+| HTTP/2 Support         | ☑ activé                  |
+| Email (Let's Encrypt)  | adresse e-mail réelle      |
+
+Cliquer **Save** — NPM génère le certificat automatiquement.
+
+---
+
+### 4.3 Proxy Host — MinIO (fichiers publics)
+
+**Hosts → Proxy Hosts → Add Proxy Host**
+
+| Champ                  | Valeur                      |
+|------------------------|-----------------------------|
+| Domain Names           | `storage.dpa.mondomaine.com`|
+| Scheme                 | `http`                      |
+| Forward Hostname / IP  | `127.0.0.1`                 |
+| Forward Port           | `9000`                      |
+| Cache Assets           | ☑ activé                   |
+| Block Common Exploits  | ☑ activé                   |
+
+**Onglet SSL :** même procédure que l'app principale.
+
+> Ce sous-domaine sert les reçus de paiement (images). NPM le proxie vers l'API MinIO.
+
+---
+
+### 4.4 Paramètre client_max_body_size (upload reçus)
+
+Par défaut Nginx limite les uploads à **1 Mo**. Les reçus de paiement peuvent être plus lourds.
+
+Dans NPM, sur le proxy host de l'application :
+
+**Onglet Advanced → Custom Nginx Configuration :**
+
+```nginx
+client_max_body_size 10m;
 ```
-
-> Caddy gère **Let's Encrypt automatiquement** — aucune configuration SSL manuelle.
-> Il suffit que les enregistrements DNS pointent vers le VPS avant le premier démarrage.
-
-### Configuration DNS chez le registrar
-
-| Type | Nom           | Valeur     |
-|------|---------------|------------|
-| A    | `dpa`         | IP du VPS  |
-| A    | `storage.dpa` | IP du VPS  |
-
-Remplacer `mondomaine.com` par le domaine réel dans le Caddyfile et les secrets.
 
 ---
 
@@ -303,16 +342,16 @@ Dans le dépôt GitHub : `Settings → Secrets and variables → Actions → New
 # Sur ta machine locale
 ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/dpa_deploy
 
-# Copier la clé publique sur le VPS (dans ~/.ssh/authorized_keys de l'utilisateur deploy)
+# Copier la clé publique sur le VPS
 ssh-copy-id -i ~/.ssh/dpa_deploy.pub deploy@IP_DU_VPS
 
-# Copier le contenu de la clé PRIVÉE dans le secret GitHub VPS_SSH_KEY
+# Afficher la clé privée à coller dans le secret GitHub VPS_SSH_KEY
 cat ~/.ssh/dpa_deploy
 ```
 
 ### 5.3 Workflow `.github/workflows/deploy.yml`
 
-Créer ce fichier dans le dépôt GitHub :
+Créer ce fichier dans le dépôt :
 
 ```yaml
 name: Build & Deploy
@@ -327,7 +366,7 @@ env:
 
 jobs:
 
-  # ── Étape 1 : Build de l'image Docker et push sur GHCR ──
+  # ── Étape 1 : Build et push de l'image Docker ────────────
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -338,7 +377,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Connexion au registre GitHub (GHCR)
+      - name: Connexion GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -348,7 +387,7 @@ jobs:
       - name: Activer le cache Docker
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push de l'image
+      - name: Build & push
         uses: docker/build-push-action@v5
         with:
           context: ./collecte-donnees
@@ -362,7 +401,7 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
 
-  # ── Étape 2 : Déploiement sur le VPS ────────────────────
+  # ── Étape 2 : Déploiement sur le VPS ─────────────────────
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -371,13 +410,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copier les fichiers de configuration sur le VPS
+      - name: Copier docker-compose.prod.yml sur le VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host:     ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key:      ${{ secrets.VPS_SSH_KEY }}
-          source:   "collecte-donnees/docker-compose.prod.yml,collecte-donnees/Caddyfile"
+          source:   "collecte-donnees/docker-compose.prod.yml"
           target:   ${{ secrets.VPS_DEPLOY_PATH }}
           strip_components: 1
 
@@ -391,8 +430,8 @@ jobs:
             set -e
             cd ${{ secrets.VPS_DEPLOY_PATH }}
 
-            # Écriture du fichier .env à partir des secrets
-            cat > .env <<'ENVEOF'
+            # Écrire le fichier .env à partir des secrets GitHub
+            cat > .env << 'ENVEOF'
             DOMAIN=${{ secrets.DOMAIN }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
@@ -400,17 +439,16 @@ jobs:
             MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
             ENVEOF
 
-            # Connexion GHCR pour puller l'image
+            # Connexion GHCR pour puller la nouvelle image
             echo "${{ secrets.GITHUB_TOKEN }}" | \
               docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Récupérer la nouvelle image
             docker pull ghcr.io/${{ github.repository_owner }}/dpa-collecte:latest
 
-            # Redémarrer les conteneurs sans interruption
+            # Redémarrer les conteneurs
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Nettoyage des anciennes images non utilisées
+            # Nettoyage
             docker image prune -f
 
             echo "✅ Déploiement terminé."
@@ -420,15 +458,13 @@ jobs:
 
 ## Phase 6 — Préparation du VPS
 
-Se connecter au VPS en root puis exécuter :
+Se connecter en root et exécuter :
 
 ```bash
-# 1. Installer Docker
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker
-systemctl start docker
+# 1. Installer Docker (si pas déjà fait — NPM l'utilise déjà, Docker est présent)
+# Vérifier : docker --version
 
-# 2. Créer un utilisateur dédié au déploiement (ne pas utiliser root)
+# 2. Créer un utilisateur dédié au déploiement
 adduser deploy
 usermod -aG docker deploy
 
@@ -438,45 +474,44 @@ chown deploy:deploy /opt/dpa-collecte
 
 # 4. Ajouter la clé publique SSH GitHub Actions
 su - deploy
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-echo "CONTENU_DE_LA_CLE_PUBLIQUE_dpa_deploy.pub" >> ~/.ssh/authorized_keys
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+echo "CONTENU_DE_dpa_deploy.pub" >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 exit
 
-# 5. (Optionnel) Ouvrir uniquement les ports nécessaires sur le pare-feu
-ufw allow 22    # SSH
-ufw allow 80    # HTTP (redirection Caddy)
-ufw allow 443   # HTTPS
-ufw enable
+# 5. Pare-feu — seuls les ports de NPM doivent être ouverts
+#    (80, 443, 81 pour l'admin NPM — déjà configurés si NPM fonctionne)
+#    Ne pas ouvrir 3000 ni 9000 sur l'interface publique
+ufw status
 ```
+
+> Si NPM tourne déjà, Docker est déjà installé et les ports 80/443 déjà ouverts.
 
 ---
 
 ## Phase 7 — Premier déploiement manuel
 
-À faire **une seule fois** sur le VPS, avant que le CI/CD prenne le relais.
+À faire **une seule fois** sur le VPS, avant que CI/CD prenne le relais.
 
 ```bash
-# Se connecter en tant que deploy
 ssh deploy@IP_DU_VPS
 cd /opt/dpa-collecte
 
-# 1. Créer le fichier .env de production
-cat > .env <<EOF
+# 1. Créer le fichier .env
+cat > .env << 'EOF'
 DOMAIN=dpa.mondomaine.com
 POSTGRES_PASSWORD=mot_de_passe_fort_ici
-NEXTAUTH_SECRET=chaine_aleatoire_32_caracteres_min
+NEXTAUTH_SECRET=$(openssl rand -base64 32)
 MINIO_ACCESS_KEY=dpa_minio_admin
 MINIO_SECRET_KEY=mot_de_passe_minio_fort
 EOF
 
-# 2. Uploader manuellement les fichiers de config (1ère fois seulement)
-# Depuis ta machine locale :
-scp collecte-donnees/docker-compose.prod.yml deploy@IP:/opt/dpa-collecte/
-scp collecte-donnees/Caddyfile              deploy@IP:/opt/dpa-collecte/
+# 2. Uploader docker-compose.prod.yml (depuis ta machine locale)
+# scp collecte-donnees/docker-compose.prod.yml deploy@IP:/opt/dpa-collecte/
 
-# 3. Démarrer tous les services
+# 3. Puller l'image et démarrer les services
+docker login ghcr.io -u TON_USERNAME_GITHUB
+docker pull ghcr.io/cybersangroup/dpa-collecte:latest
 docker compose -f docker-compose.prod.yml up -d
 
 # 4. Vérifier que tout tourne
@@ -490,47 +525,56 @@ docker exec -it dpa-collecte-minio-1 sh -c "
   mc anonymous set download local/recus
 "
 
-# 6. Seeder la base de données (si vide)
+# 6. Seeder la base si vide
 docker exec -it dpa-collecte-app-1 node -e "
   import('./prisma/seed.mjs').then(() => process.exit(0))
 "
+
+# 7. Créer le compte admin
+docker exec -it dpa-collecte-app-1 node scripts/create-admin.mjs
 ```
+
+---
+
+## Phase 8 — Configurer NPM (après démarrage des conteneurs)
+
+Une fois les conteneurs démarrés, créer les deux proxy hosts comme décrit en **Phase 4**.
+
+Vérifier que les deux URL fonctionnent en HTTPS :
+- `https://dpa.mondomaine.com` → l'application
+- `https://storage.dpa.mondomaine.com` → MinIO (accès fichiers)
+
+Tester depuis un navigateur, vérifier le cadenas SSL.
 
 ---
 
 ## Récapitulatif des volumes Docker
 
-| Volume        | Contenu                          | Criticité       |
-|---------------|----------------------------------|-----------------|
-| `pgdata`      | Données PostgreSQL               | 🔴 Critique      |
-| `minio_data`  | Reçus de paiement (images)       | 🔴 Critique      |
-| `caddy_data`  | Certificats SSL Let's Encrypt    | 🟡 Important     |
-| `caddy_config`| Configuration Caddy interne      | 🟡 Important     |
+| Volume       | Contenu                     | Criticité    |
+|--------------|-----------------------------|--------------|
+| `pgdata`     | Données PostgreSQL          | 🔴 Critique   |
+| `minio_data` | Reçus de paiement (images)  | 🔴 Critique   |
+
+> NPM gère ses propres certificats et données dans ses propres volumes Docker.
 
 ### Sauvegarde automatique (cron recommandé)
 
 ```bash
-# Ajouter dans crontab -e de l'utilisateur deploy
-# Backup quotidien à 3h du matin
+# Ajouter dans crontab -e (en tant que deploy)
 0 3 * * * /opt/dpa-collecte/scripts/backup.sh
 ```
 
-Exemple de `scripts/backup.sh` :
+Créer `scripts/backup.sh` :
 
 ```bash
 #!/bin/bash
 DATE=$(date +%Y-%m-%d)
 BACKUP_DIR=/opt/backups/dpa-collecte
-
 mkdir -p $BACKUP_DIR
 
 # Dump PostgreSQL
 docker exec dpa-collecte-db-1 \
   pg_dump -U dpa_user dpa_collecte | gzip > $BACKUP_DIR/db-$DATE.sql.gz
-
-# Sync MinIO vers stockage externe (ex. Backblaze B2 ou autre S3)
-# rclone sync /var/lib/docker/volumes/dpa-collecte_minio_data/_data \
-#   backblaze:mon-bucket-backup/minio/$DATE
 
 # Supprimer les backups de plus de 30 jours
 find $BACKUP_DIR -name "*.gz" -mtime +30 -delete
@@ -542,33 +586,34 @@ echo "✅ Backup $DATE terminé."
 
 ## Réseau entre les conteneurs
 
-Tous les services partagent le réseau Docker interne `dpa_net`.
-Les conteneurs se parlent **par nom de service** — aucun port externe exposé sauf Caddy.
+| Depuis → Vers   | Adresse interne  | Port |
+|-----------------|------------------|------|
+| `app` → `db`    | `db:5432`        | 5432 |
+| `app` → `minio` | `minio:9000`     | 9000 |
+| NPM → `app`     | `127.0.0.1:3000` | 3000 |
+| NPM → `minio`   | `127.0.0.1:9000` | 9000 |
 
-| Depuis → Vers     | Adresse interne         | Port  |
-|-------------------|-------------------------|-------|
-| `app` → `db`      | `db:5432`               | 5432  |
-| `app` → `minio`   | `minio:9000`            | 9000  |
-| `caddy` → `app`   | `app:3000`              | 3000  |
-| `caddy` → `minio` | `minio:9000`            | 9000  |
+NPM et les conteneurs DPA ne sont **pas sur le même réseau Docker** — NPM accède
+aux services via `127.0.0.1` (interface loopback de l'hôte), ce qui est sécurisé
+car ces ports ne sont pas exposés à l'extérieur.
 
 ---
 
 ## Ordre d'exécution global
 
 ```
-Étape 1  →  Préparer le VPS (Docker, utilisateur deploy, clé SSH, pare-feu)
+Étape 1  →  Préparer le VPS (utilisateur deploy, clé SSH)
 Étape 2  →  Configurer le DNS (enregistrements A → IP du VPS)
-Étape 3  →  Modifier next.config : output "standalone"
-Étape 4  →  Migrer uploadRecu de Vercel Blob vers MinIO (SDK S3)
-Étape 5  →  Créer Dockerfile + .dockerignore + docker-entrypoint.sh
-Étape 6  →  Créer docker-compose.prod.yml + Caddyfile
-Étape 7  →  Ajouter les secrets dans GitHub
-Étape 8  →  Créer .github/workflows/deploy.yml
-Étape 9  →  Premier déploiement manuel (init BDD + bucket MinIO)
-Étape 10 →  Pousser un commit sur main → CI/CD automatique déclenché
-Étape 11 →  Vérifier HTTPS, tester l'app en production
-Étape 12 →  Fermer le port 9001 (console MinIO) après configuration initiale
+Étape 3  →  Migrer uploadRecu : Vercel Blob → MinIO (SDK S3)
+Étape 4  →  Créer Dockerfile + .dockerignore + docker-entrypoint.sh
+Étape 5  →  Créer docker-compose.prod.yml
+Étape 6  →  Ajouter les secrets dans GitHub
+Étape 7  →  Créer .github/workflows/deploy.yml
+Étape 8  →  Premier déploiement manuel (init BDD + bucket MinIO)
+Étape 9  →  Configurer les deux Proxy Hosts dans NPM (+ SSL Let's Encrypt)
+Étape 10 →  Vérifier HTTPS sur les deux sous-domaines
+Étape 11 →  Pousser un commit sur main → CI/CD automatique activé
+Étape 12 →  Fermer le port 9001 (console MinIO) dans le pare-feu après init
 Étape 13 →  Mettre en place le cron de sauvegarde
 ```
 
@@ -576,15 +621,15 @@ Les conteneurs se parlent **par nom de service** — aucun port externe exposé 
 
 ## Variables d'environnement — référence complète
 
-| Variable              | Exemple                                              | Usage                         |
-|-----------------------|------------------------------------------------------|-------------------------------|
-| `DATABASE_URL`        | `postgresql://dpa_user:PWD@db:5432/dpa_collecte`     | Prisma (connexion poolée)     |
-| `DIRECT_URL`          | `postgresql://dpa_user:PWD@db:5432/dpa_collecte`     | Prisma (migrations directes)  |
-| `NEXTAUTH_URL`        | `https://dpa.mondomaine.com`                         | Auth.js                       |
-| `NEXTAUTH_SECRET`     | `chaine_aleatoire_32_car_min`                        | Auth.js (JWT signing)         |
-| `NEXT_PUBLIC_APP_URL` | `https://dpa.mondomaine.com`                         | QR codes, liens publics       |
-| `MINIO_ENDPOINT`      | `http://minio:9000`                                  | Upload reçus (interne)        |
-| `MINIO_ACCESS_KEY`    | `dpa_minio_admin`                                    | Authentification MinIO        |
-| `MINIO_SECRET_KEY`    | `mot_de_passe_fort`                                  | Authentification MinIO        |
-| `MINIO_BUCKET`        | `recus`                                              | Nom du bucket                 |
-| `MINIO_PUBLIC_URL`    | `https://storage.dpa.mondomaine.com`                 | URL publique des fichiers     |
+| Variable              | Exemple                                           | Usage                        |
+|-----------------------|---------------------------------------------------|------------------------------|
+| `DATABASE_URL`        | `postgresql://dpa_user:PWD@db:5432/dpa_collecte`  | Prisma (connexion poolée)    |
+| `DIRECT_URL`          | `postgresql://dpa_user:PWD@db:5432/dpa_collecte`  | Prisma (migrations)          |
+| `NEXTAUTH_URL`        | `https://dpa.mondomaine.com`                      | Auth.js                      |
+| `NEXTAUTH_SECRET`     | `chaine_aleatoire_32_car_min`                     | Auth.js (JWT signing)        |
+| `NEXT_PUBLIC_APP_URL` | `https://dpa.mondomaine.com`                      | QR codes, liens publics      |
+| `MINIO_ENDPOINT`      | `http://minio:9000`                               | Upload reçus (réseau interne)|
+| `MINIO_ACCESS_KEY`    | `dpa_minio_admin`                                 | Auth MinIO                   |
+| `MINIO_SECRET_KEY`    | `mot_de_passe_fort`                               | Auth MinIO                   |
+| `MINIO_BUCKET`        | `recus`                                           | Nom du bucket                |
+| `MINIO_PUBLIC_URL`    | `https://storage.dpa.mondomaine.com`              | URL publique des fichiers    |
