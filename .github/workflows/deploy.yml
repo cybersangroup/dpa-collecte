@@ -55,10 +55,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Préparer la clé SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          # La clé est stockée en base64 dans le secret pour éviter tout problème de formatage
-          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
