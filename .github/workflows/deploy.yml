@@ -57,8 +57,8 @@ jobs:
       - name: Préparer la clé SSH
         run: |
           mkdir -p ~/.ssh
-          # tr -d '\r' supprime les éventuels CRLF Windows
-          printf '%s' "${{ secrets.VPS_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          # La clé est stockée en base64 dans le secret pour éviter tout problème de formatage
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
