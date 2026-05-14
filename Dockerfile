@@ -44,9 +44,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 # Copier le schéma Prisma (nécessaire pour les migrations au démarrage)
 COPY --from=builder /app/prisma ./prisma
 
-# Copier le client Prisma compilé
-COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+# Copier le client Prisma compilé + le CLI (évite que npx télécharge une version incompatible)
+COPY --from=deps /app/node_modules/.prisma      ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma      ./node_modules/@prisma
+COPY --from=deps /app/node_modules/prisma       ./node_modules/prisma
+COPY --from=deps /app/node_modules/.bin/prisma  ./node_modules/.bin/prisma
 
 # Script de démarrage (migrations + lancement)
 COPY scripts/docker-entrypoint.sh ./entrypoint.sh
