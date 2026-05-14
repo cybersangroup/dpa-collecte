@@ -54,48 +54,41 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
+      - name: Préparer la clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          # tr -d '\r' supprime les éventuels CRLF Windows
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Créer le fichier .env et le copier sur le VPS
+        run: |
+          cat > /tmp/prod.env << 'EOF'
+          DOMAIN=${{ secrets.DOMAIN }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+          MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
+          EOF
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              /tmp/prod.env \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/.env"
+
       - name: Copier docker-compose.prod.yml sur le VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host:     ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key:      ${{ secrets.VPS_SSH_KEY }}
-          source:   "docker-compose.prod.yml"
-          target:   ${{ secrets.VPS_DEPLOY_PATH }}
-          strip_components: 1
-          debug:    true
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              docker-compose.prod.yml \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/docker-compose.prod.yml"
 
       - name: Déployer via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host:     ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key:      ${{ secrets.VPS_SSH_KEY }}
-          debug:    true
-          script: |
-            set -e
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
-
-            # Écrire le fichier .env à partir des secrets GitHub
-            cat > .env << 'ENVEOF'
-            DOMAIN=${{ secrets.DOMAIN }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-            MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
-            MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
-            ENVEOF
-
-            # Connexion GHCR pour puller la nouvelle image
-            echo "${{ secrets.GITHUB_TOKEN }}" | \
-              docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            # Récupérer la nouvelle image
-            docker pull ghcr.io/${{ github.repository_owner }}/dpa-collecte:latest
-
-            # Redémarrer les conteneurs sans interruption
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-            # Nettoyage des anciennes images inutilisées
-            docker image prune -f
-
-            echo "✅ Déploiement terminé — $(date)"
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+              "set -e
+               echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+               cd '${{ secrets.VPS_DEPLOY_PATH }}'
+               docker pull ghcr.io/${{ github.repository_owner }}/dpa-collecte:latest
+               docker compose -f docker-compose.prod.yml up -d --remove-orphans
+               docker image prune -f
+               echo '✅ Déploiement terminé'"
