@@ -12,15 +12,18 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Variables nécessaires au build
-ARG NEXTAUTH_URL
-ARG NEXT_PUBLIC_APP_URL
+ARG NEXTAUTH_URL=https://localhost
+ARG NEXT_PUBLIC_APP_URL=https://localhost
+ARG NEXTAUTH_SECRET=build-secret-placeholder-not-used-in-prod
 # DATABASE_URL et DIRECT_URL factices pour satisfaire Prisma à la compilation (pas de connexion réelle)
 ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ARG DIRECT_URL=postgresql://build:build@localhost:5432/build
+ENV NEXTAUTH_URL=$NEXTAUTH_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
 ENV DATABASE_URL=$DATABASE_URL
 ENV DIRECT_URL=$DIRECT_URL
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_OPTIONS=--max-old-space-size=2048
 
 RUN npm run build
 
