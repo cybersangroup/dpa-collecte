@@ -62,6 +62,9 @@ jobs:
       - name: Ajouter le VPS aux hôtes connus
         run: ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Vérifier l'empreinte de la clé chargée
+        run: ssh-add -l
+
       - name: Créer le fichier .env et le copier sur le VPS
         run: |
           cat > /tmp/prod.env << 'EOF'
