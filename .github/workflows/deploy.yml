@@ -40,7 +40,6 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
           build-args: |
-            NEXTAUTH_URL=https://${{ secrets.DOMAIN }}
             NEXT_PUBLIC_APP_URL=https://${{ secrets.DOMAIN }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
