@@ -14,9 +14,11 @@ COPY . .
 # Variables nécessaires au build
 ARG NEXTAUTH_URL
 ARG NEXT_PUBLIC_APP_URL
-# DATABASE_URL factice pour satisfaire Prisma à la compilation (pas de connexion réelle)
+# DATABASE_URL et DIRECT_URL factices pour satisfaire Prisma à la compilation (pas de connexion réelle)
 ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
+ARG DIRECT_URL=postgresql://build:build@localhost:5432/build
 ENV DATABASE_URL=$DATABASE_URL
+ENV DIRECT_URL=$DIRECT_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=2048
 
