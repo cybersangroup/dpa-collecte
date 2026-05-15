@@ -63,14 +63,16 @@ jobs:
         run: ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Créer le fichier .env et le copier sur le VPS
+        env:
+          V_DOMAIN:            ${{ secrets.DOMAIN }}
+          V_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          V_NEXTAUTH_SECRET:   ${{ secrets.NEXTAUTH_SECRET }}
+          V_MINIO_ACCESS_KEY:  ${{ secrets.MINIO_ACCESS_KEY }}
+          V_MINIO_SECRET_KEY:  ${{ secrets.MINIO_SECRET_KEY }}
         run: |
-          cat > /tmp/prod.env <<EOF
-DOMAIN=${{ secrets.DOMAIN }}
-POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
-MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
-EOF
+          printf 'DOMAIN=%s\nPOSTGRES_PASSWORD=%s\nNEXTAUTH_SECRET=%s\nMINIO_ACCESS_KEY=%s\nMINIO_SECRET_KEY=%s\n' \
+            "$V_DOMAIN" "$V_POSTGRES_PASSWORD" "$V_NEXTAUTH_SECRET" "$V_MINIO_ACCESS_KEY" "$V_MINIO_SECRET_KEY" \
+            > /tmp/prod.env
           scp -o StrictHostKeyChecking=no \
               /tmp/prod.env \
               "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_DEPLOY_PATH }}/.env"
