@@ -51,6 +51,9 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
 
+# Scripts utilitaires (create-admin, etc.)
+COPY scripts ./scripts
+
 # Script de démarrage (migrations + lancement)
 COPY scripts/docker-entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
