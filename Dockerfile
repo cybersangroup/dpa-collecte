@@ -36,6 +36,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
+# Installer le CLI Prisma 6 globalement (évite que l'entrypoint télécharge Prisma 7)
+RUN npm install -g prisma@6 --no-fund --no-audit
+
 # Copier le build standalone + assets statiques
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
@@ -44,11 +47,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 # Copier le schéma Prisma (nécessaire pour les migrations au démarrage)
 COPY --from=builder /app/prisma ./prisma
 
-# Copier le client Prisma compilé + le CLI (évite que npx télécharge une version incompatible)
-COPY --from=deps /app/node_modules/.prisma      ./node_modules/.prisma
-COPY --from=deps /app/node_modules/@prisma      ./node_modules/@prisma
-COPY --from=deps /app/node_modules/prisma       ./node_modules/prisma
-COPY --from=deps /app/node_modules/.bin/prisma  ./node_modules/.bin/prisma
+# Copier le client Prisma compilé
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
 
 # Script de démarrage (migrations + lancement)
 COPY scripts/docker-entrypoint.sh ./entrypoint.sh
