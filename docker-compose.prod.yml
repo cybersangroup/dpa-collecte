@@ -55,8 +55,8 @@ services:
       MINIO_BUCKET:        recus
       MINIO_PUBLIC_URL:    https://storage.${DOMAIN}
     ports:
-      # Exposé uniquement sur localhost — Nginx Proxy Manager proxie vers ce port
-      - "127.0.0.1:3000:3000"
+      # Accessible depuis le réseau Docker (pour que NPM puisse proxier)
+      - "3000:3000"
     networks: [dpa_net]
 
 volumes:
