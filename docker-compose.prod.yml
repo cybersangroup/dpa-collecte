@@ -29,12 +29,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
-    ports:
-      # API S3 — Nginx Proxy Manager proxie vers ce port pour les fichiers publics
-      - "127.0.0.1:9000:9000"
-      # Console admin — accès local uniquement (à fermer après la configuration initiale)
-      - "127.0.0.1:9001:9001"
-    networks: [dpa_net]
+    networks: [dpa_net, web_network]
 
   # ── Application Next.js ──────────────────────────────────────────────────────
   app:
@@ -54,10 +49,7 @@ services:
       MINIO_SECRET_KEY:    ${MINIO_SECRET_KEY}
       MINIO_BUCKET:        recus
       MINIO_PUBLIC_URL:    https://storage.${DOMAIN}
-    ports:
-      # Accessible depuis le réseau Docker (pour que NPM puisse proxier)
-      - "3000:3000"
-    networks: [dpa_net]
+    networks: [dpa_net, web_network]
 
 volumes:
   pgdata:     # Données PostgreSQL (critique — sauvegarder régulièrement)
@@ -66,3 +58,6 @@ volumes:
 networks:
   dpa_net:
     driver: bridge
+  web_network:
+    external: true
+    name: web_network
