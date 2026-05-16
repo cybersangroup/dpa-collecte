@@ -39,6 +39,7 @@ services:
       db:    { condition: service_healthy }
       minio: { condition: service_started }
     environment:
+      HOSTNAME:            0.0.0.0
       DATABASE_URL:        postgresql://dpa_user:${POSTGRES_PASSWORD}@db:5432/dpa_collecte
       DIRECT_URL:          postgresql://dpa_user:${POSTGRES_PASSWORD}@db:5432/dpa_collecte
       NEXTAUTH_URL:        https://${DOMAIN}
