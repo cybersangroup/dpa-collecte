@@ -5,6 +5,18 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+export async function deleteStudent(id: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "ADMIN") return { ok: false, error: "Accès refusé." };
+  try {
+    await db.student.delete({ where: { id } });
+    revalidatePath("/collectes-donnees");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Suppression impossible." };
+  }
+}
+
 export type StudentFormState =
   | { status: "idle" }
   | { status: "error"; message: string }
@@ -39,6 +51,9 @@ export async function createStudent(
       : null;
     const classe = isEtudiant
       ? String(formData.get("classe") ?? "").trim() || null
+      : null;
+    const filiere = isEtudiant
+      ? String(formData.get("filiere") ?? "").trim() || null
       : null;
 
     const nombreElevesRaw = hasNombreEleves ? formData.get("nombreEleves") : null;
@@ -84,6 +99,7 @@ export async function createStudent(
         countryCode,
         niveauScolaire,
         classe,
+        filiere,
         nombreEleves,
         etablissement,
         adresse,

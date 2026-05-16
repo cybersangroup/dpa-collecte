@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { QRCodeCanvas } from "qrcode.react";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { updateStatutInscription } from "./actions";
+import { updateStatutInscription, deleteInscription } from "./actions";
+
+const PAGE_SIZE = 20;
 
 type Inscription = {
   id: string;
@@ -33,9 +36,11 @@ const STATUT_LABELS: Record<string, {
 
 // ─── Dropdown avec position fixe (évite le clip de overflow-x-auto) ──────────
 
-function ActionDropdown({ inscription, onUpdate }: {
+function ActionDropdown({ inscription, onUpdate, onDelete, isAdmin }: {
   inscription: Inscription;
   onUpdate: (id: string, statut: "EN_ATTENTE" | "VALIDEE" | "REJETEE") => void;
+  onDelete: (ins: Inscription) => void;
+  isAdmin: boolean;
 }) {
   const [open, setOpen]     = useState(false);
   const [pos, setPos]       = useState<{ top: number; right: number } | null>(null);
@@ -98,6 +103,15 @@ function ActionDropdown({ inscription, onUpdate }: {
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary transition-colors text-left">
         <IconEdit /> Modifier
       </a>
+      {isAdmin && (
+        <>
+          <div className="my-1 border-t border-border" />
+          <button onClick={() => { setOpen(false); onDelete(inscription); }}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-destructive/10 transition-colors text-left text-destructive">
+            <IconTrash /> Supprimer
+          </button>
+        </>
+      )}
     </div>,
     document.body,
   ) : null;
@@ -203,16 +217,36 @@ export function InscriptionsClient({
   appUrl: string;
   totalCount: number;
 }) {
-  const [inscriptions, setInscriptions] = useState(initial);
-  const [search, setSearch]             = useState("");
-  const [filterStatut, setFilterStatut] = useState("ALL");
-  const [filterType, setFilterType]     = useState("ALL");
-  const [selected, setSelected]         = useState<Set<string>>(new Set());
-  const [bulkLoading, setBulkLoading]   = useState(false);
-  const [showQR, setShowQR]             = useState(false);
+  const { data: session }                = useSession();
+  const isAdmin                          = session?.user?.role === "ADMIN";
+  const [inscriptions, setInscriptions]  = useState(initial);
+  const [search, setSearch]              = useState("");
+  const [filterStatut, setFilterStatut]  = useState("ALL");
+  const [filterType, setFilterType]      = useState("ALL");
+  const [selected, setSelected]          = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading]    = useState(false);
+  const [showQR, setShowQR]              = useState(false);
+  const [page, setPage]                  = useState(1);
+  const [deleteTarget, setDeleteTarget]  = useState<Inscription | null>(null);
+  const [isPending, startTransition]     = useTransition();
 
   const handleUpdate = (id: string, statut: "EN_ATTENTE" | "VALIDEE" | "REJETEE") => {
     setInscriptions((prev) => prev.map((i) => i.id === id ? { ...i, statut } : i));
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    startTransition(async () => {
+      const res = await deleteInscription(id);
+      if (res.ok) {
+        setInscriptions((prev) => prev.filter((i) => i.id !== id));
+        setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        setDeleteTarget(null);
+      } else {
+        alert(res.error ?? "Erreur lors de la suppression.");
+      }
+    });
   };
 
   const filtered = useMemo(() => {
@@ -228,6 +262,9 @@ export function InscriptionsClient({
       return matchSearch && matchStatut && matchType;
     });
   }, [inscriptions, search, filterStatut, filterType]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const allSelected  = filtered.length > 0 && filtered.every((i) => selected.has(i.id));
   const someSelected = selected.size > 0;
@@ -249,6 +286,32 @@ export function InscriptionsClient({
   return (
     <>
       {showQR && <QRModal url={inscriptionUrl} onClose={() => setShowQR(false)} />}
+
+      {/* ── Modal suppression ── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-card rounded-2xl border border-border shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <IconTrash className="text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Supprimer cette inscription ?</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {deleteTarget.nomParent ?? deleteTarget.telephone} — cette action est irréversible.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="md" onClick={() => setDeleteTarget(null)} disabled={isPending}>Annuler</Button>
+              <Button size="md" className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={confirmDelete} disabled={isPending}>
+                {isPending ? "Suppression…" : "Supprimer"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* ── Header : titre + boutons ── */}
@@ -288,13 +351,13 @@ export function InscriptionsClient({
               className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
           </div>
           <div className="flex flex-wrap gap-2">
-            <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value)} className={selClass + " flex-1 min-w-[130px]"}>
+            <select value={filterStatut} onChange={(e) => { setFilterStatut(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[130px]"}>
               <option value="ALL">Tous statuts</option>
               <option value="EN_ATTENTE">En attente</option>
               <option value="VALIDEE">Validée</option>
               <option value="REJETEE">Rejetée</option>
             </select>
-            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={selClass + " flex-1 min-w-[110px]"}>
+            <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[110px]"}>
               <option value="ALL">Tous types</option>
               <option value="ADULTE">Adulte</option>
               <option value="PARENT">Parent</option>
@@ -344,7 +407,7 @@ export function InscriptionsClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((ins) => {
+                {paginated.map((ins) => {
                   const s = STATUT_LABELS[ins.statut];
                   return (
                     <tr key={ins.id} className={`hover:bg-secondary/30 transition-colors ${selected.has(ins.id) ? "bg-primary/5" : ""}`}>
@@ -379,18 +442,43 @@ export function InscriptionsClient({
                         {new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(ins.createdAt))}
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <ActionDropdown inscription={ins} onUpdate={handleUpdate} />
+                        <ActionDropdown inscription={ins} onUpdate={handleUpdate}
+                          onDelete={setDeleteTarget} isAdmin={isAdmin} />
                       </td>
                     </tr>
                   );
                 })}
-                {filtered.length === 0 && (
+                {paginated.length === 0 && (
                   <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune inscription trouvée.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Page {page} / {totalPages} · {filtered.length} résultat(s)
+            </p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage(1)}>«</Button>
+              <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                const p = start + i;
+                if (p > totalPages) return null;
+                return (
+                  <Button key={p} variant={p === page ? "primary" : "outline"} size="md"
+                    onClick={() => setPage(p)} className="min-w-[2.25rem]">{p}</Button>
+                );
+              })}
+              <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</Button>
+              <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -488,3 +576,6 @@ function IconClock() { return <svg width="14" height="14" viewBox="0 0 24 24" fi
 function IconEdit()  { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>; }
 function IconQr()    { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3" /><path d="M21 14v0" /><path d="M14 21h7" /><path d="M21 17v4" /></svg>; }
 function IconPlus()  { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>; }
+function IconTrash({ className }: { className?: string }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" /></svg>;
+}

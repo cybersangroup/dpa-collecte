@@ -90,6 +90,8 @@ model Student {
   niveauScolaire String?
   // ETUDIANT_ELEVE uniquement: classe précise (Terminale, 3ème, etc.)
   classe         String?
+  // ETUDIANT_ELEVE en Première ou Terminale uniquement
+  filiere        String?
   // Visible pour SURVEILLANT et PARENT — null pour ETUDIANT_ELEVE/PROF
   nombreEleves   Int?
   // Masqué pour PARENT

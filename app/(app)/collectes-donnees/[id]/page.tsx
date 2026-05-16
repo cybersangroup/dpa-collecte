@@ -99,6 +99,10 @@ export default async function CollecteDetailPage({
                   value={[s.niveauScolaire, s.classe].filter(Boolean).join(" — ")}
                 />
               )}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {(s as any).filiere && (
+                <Row label="Filière" value={(s as any).filiere} />
+              )}
               {s.nombreEleves != null && (
                 <Row label="Nombre d'élèves" value={String(s.nombreEleves)} />
               )}

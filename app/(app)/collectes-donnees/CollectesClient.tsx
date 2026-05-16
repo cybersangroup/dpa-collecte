@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { deleteStudent } from "@/app/(app)/etudiants/actions";
+
+const PAGE_SIZE = 20;
 
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
 
@@ -136,6 +140,9 @@ export function CollectesClient({
   campaigns: Campaign[];
   totalCount: number;
 }) {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const [search, setSearch]               = useState("");
   const [filterProfil, setFilterProfil]   = useState("ALL");
   const [filterSite, setFilterSite]       = useState("ALL");
@@ -143,10 +150,29 @@ export function CollectesClient({
   const [filterCampaign, setFilterCampaign] = useState("ALL");
   const [sortBy, setSortBy]               = useState<"nom" | "date" | "site">("date");
   const [sortAsc, setSortAsc]             = useState(false);
+  const [page, setPage]                   = useState(1);
+  const [deleteTarget, setDeleteTarget]   = useState<Student | null>(null);
+  const [isPending, startTransition]      = useTransition();
+  const [localStudents, setLocalStudents] = useState(students);
+
+  const handleDelete = (s: Student) => setDeleteTarget(s);
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    startTransition(async () => {
+      const res = await deleteStudent(id);
+      if (res.ok) {
+        setLocalStudents((prev) => prev.filter((s) => s.id !== id));
+        setDeleteTarget(null);
+      } else {
+        alert(res.error ?? "Erreur lors de la suppression.");
+      }
+    });
+  };
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    const list = students.filter((s) => {
+    const list = localStudents.filter((s) => {
       const fullName = `${s.nom} ${s.prenom ?? ""}`.toLowerCase();
       const matchSearch  = !q || fullName.includes(q) || s.telephone.includes(q) || (s.etablissement ?? "").toLowerCase().includes(q);
       const matchProfil  = filterProfil  === "ALL" || s.profileType  === filterProfil;
@@ -167,11 +193,15 @@ export function CollectesClient({
     });
 
     return list;
-  }, [students, search, filterProfil, filterSite, filterSource, filterCampaign, sortBy, sortAsc]);
+  }, [localStudents, search, filterProfil, filterSite, filterSource, filterCampaign, sortBy, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const toggleSort = (col: "nom" | "date" | "site") => {
     if (sortBy === col) setSortAsc((p) => !p);
     else { setSortBy(col); setSortAsc(true); }
+    setPage(1);
   };
 
   const SortIcon = ({ col }: { col: "nom" | "date" | "site" }) => (
@@ -188,6 +218,34 @@ export function CollectesClient({
 
   return (
     <div className="space-y-4">
+      {/* ── Modal de confirmation suppression ── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-card rounded-2xl border border-border shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-destructive">
+                  <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold">Supprimer cette collecte ?</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {deleteTarget.nom} {deleteTarget.prenom} — cette action est irréversible.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="md" onClick={() => setDeleteTarget(null)} disabled={isPending}>Annuler</Button>
+              <Button size="md" className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={confirmDelete} disabled={isPending}>
+                {isPending ? "Suppression…" : "Supprimer"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── En-tête : titre + actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -220,24 +278,24 @@ export function CollectesClient({
             className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
         </div>
         <div className="flex flex-wrap gap-2">
-          <select value={filterProfil} onChange={(e) => setFilterProfil(e.target.value)} className={selClass + " flex-1 min-w-[140px]"}>
+          <select value={filterProfil} onChange={(e) => { setFilterProfil(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[140px]"}>
             <option value="ALL">Tous profils</option>
             <option value="ETUDIANT_ELEVE">Étudiant/Élève</option>
             <option value="PROF">Professeur</option>
             <option value="SURVEILLANT">Surveillant</option>
             <option value="PARENT">Parent</option>
           </select>
-          <select value={filterSite} onChange={(e) => setFilterSite(e.target.value)} className={selClass + " flex-1 min-w-[100px]"}>
+          <select value={filterSite} onChange={(e) => { setFilterSite(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[100px]"}>
             <option value="ALL">Tous sites</option>
             <option value="DKR">DKR</option>
             <option value="DJIB">DJIB</option>
           </select>
-          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className={selClass + " flex-1 min-w-[120px]"}>
+          <select value={filterSource} onChange={(e) => { setFilterSource(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[120px]"}>
             <option value="ALL">Toutes sources</option>
             <option value="QR_AUTO">QR auto</option>
             <option value="OPERATEUR">Opérateur</option>
           </select>
-          <select value={filterCampaign} onChange={(e) => setFilterCampaign(e.target.value)} className={selClass + " flex-1 min-w-[160px]"}>
+          <select value={filterCampaign} onChange={(e) => { setFilterCampaign(e.target.value); setPage(1); }} className={selClass + " flex-1 min-w-[160px]"}>
             <option value="ALL">Toutes tournées</option>
             <option value="NONE">Sans tournée</option>
             {campaigns.map((c) => (
@@ -248,7 +306,7 @@ export function CollectesClient({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {filtered.length} enregistrement(s){filtered.length !== students.length && ` sur ${students.length}`}
+        {filtered.length} enregistrement(s){filtered.length !== localStudents.length && ` sur ${localStudents.length}`}
       </p>
 
       {/* Table */}
@@ -274,11 +332,11 @@ export function CollectesClient({
                   onClick={() => toggleSort("date")}>
                   <span className="inline-flex items-center gap-1.5">Date <SortIcon col="date" /></span>
                 </th>
-                <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Actions</th>
+                <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">{isAdmin ? "Actions" : ""}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((s) => {
+              {paginated.map((s) => {
                 const profil = profileLabels[s.profileType] ?? profileLabels.ETUDIANT_ELEVE;
                 const initials = `${s.nom[0] ?? ""}${s.prenom?.[0] ?? ""}`.toUpperCase();
                 const niveauInfo = s.classe
@@ -330,18 +388,29 @@ export function CollectesClient({
                       {formatDateTime(s.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <Link href={`/collectes-donnees/${s.id}`}>
-                        <Button variant="ghost" size="icon" aria-label="Voir">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m9 18 6-6-6-6" />
-                          </svg>
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/collectes-donnees/${s.id}`}>
+                          <Button variant="ghost" size="icon" aria-label="Voir">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m9 18 6-6-6-6" />
+                            </svg>
+                          </Button>
+                        </Link>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" aria-label="Supprimer"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(s); }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+                            </svg>
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {paginated.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     Aucune donnée collectée trouvée.
@@ -352,6 +421,42 @@ export function CollectesClient({
           </table>
         </div>
       </div>
+
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Page {page} / {totalPages} · {filtered.length} résultat(s)
+          </p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage(1)} aria-label="Première page">
+              «
+            </Button>
+            <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Page précédente">
+              ‹
+            </Button>
+            {/* Numéros de page */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+              const p = start + i;
+              if (p > totalPages) return null;
+              return (
+                <Button key={p} variant={p === page ? "primary" : "outline"} size="md"
+                  onClick={() => setPage(p)} aria-label={`Page ${p}`} aria-current={p === page ? "page" : undefined}
+                  className="min-w-[2.25rem]">
+                  {p}
+                </Button>
+              );
+            })}
+            <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Page suivante">
+              ›
+            </Button>
+            <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage(totalPages)} aria-label="Dernière page">
+              »
+            </Button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -6,6 +6,21 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
+// ─── Suppression (admin uniquement) ─────────────────────────────────────────
+
+export async function deleteInscription(id: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "ADMIN") return { ok: false, error: "Accès refusé." };
+  try {
+    await db.inscriptionEnfant.deleteMany({ where: { inscriptionId: id } });
+    await db.inscription.delete({ where: { id } });
+    revalidatePath("/inscriptions");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Suppression impossible." };
+  }
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type InscriptionFormState =

@@ -13,11 +13,23 @@ const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VaDPA000000000000
 
 /* ─── Hiérarchie Niveau → Classes (Étudiant/Élève) ─── */
 const NIVEAUX_CLASSES: Record<string, string[]> = {
-  "Préscolaire": ["Petite section", "Moyenne section", "Grande section"],
-  "Primaire":    ["CP", "CE1", "CE2", "CM1", "CM2"],
-  "Collège":     ["6ème", "5ème", "4ème", "3ème"],
-  "Lycée":       ["Seconde", "Première", "Terminale"],
-  "Supérieur":   ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2"],
+  "Préscolaire":     ["Petite section", "Moyenne section", "Grande section"],
+  "Primaire":        ["CP", "CE1", "CE2", "CM1", "CM2"],
+  "Collège":         ["6ème", "5ème", "4ème", "3ème"],
+  "Lycée Général":   ["Seconde", "Première", "Terminale"],
+  "Lycée Technique": ["Seconde", "Première", "Terminale"],
+  "Supérieur":       ["Licence 1", "Licence 2", "Licence 3", "Master 1", "Master 2"],
+};
+
+const CLASSES_AVEC_FILIERE = ["Première", "Terminale"];
+
+const FILIERES: Record<string, string[]> = {
+  "Lycée Général": ["S", "L", "SES", "GFM", "IAG", "OGRH"],
+  "Lycée Technique": [
+    "IRT", "IMSEC", "ARC", "Compta/Gestion", "Génie civil",
+    "Électro/Énergie", "Maintenance", "Tourisme", "Restauration",
+    "Cuisine", "Accueil", "Gest. Administration Entreprise", "Logistique transport",
+  ],
 };
 
 type ProfileType = "ETUDIANT_ELEVE" | "PROF" | "SURVEILLANT" | "PARENT";
@@ -41,20 +53,23 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
   const boundAction = createStudent.bind(null, { cityId, campaignId, source });
   const [state, action, isPending] = useActionState(boundAction, initialState);
 
-  const [profile, setProfile]         = useState<ProfileType>("ETUDIANT_ELEVE");
-  const [countryIso, setCountryIso]   = useState("SN");
+  const [profile, setProfile]           = useState<ProfileType>("ETUDIANT_ELEVE");
+  const [countryIso, setCountryIso]     = useState("SN");
   const [niveauChoisi, setNiveauChoisi] = useState("");
-  const [formKey, setFormKey]         = useState(0);
+  const [classeChoisie, setClasseChoisie] = useState("");
+  const [formKey, setFormKey]           = useState(0);
   const [showWaPopup, setShowWaPopup] = useState(false);
   const [countdown, setCountdown]     = useState(5);
 
-  const selectedCountry   = countryPhoneOptions.find((c) => c.iso === countryIso) ?? countryPhoneOptions[0];
-  const isEtudiant        = profile === "ETUDIANT_ELEVE";
-  const showNiveauClasse  = isEtudiant;
-  const showNiveauLibre   = profile === "PROF";
-  const showNombreEleves  = profile === "SURVEILLANT" || profile === "PARENT";
-  const showEtablissement = profile !== "PARENT";
+  const selectedCountry    = countryPhoneOptions.find((c) => c.iso === countryIso) ?? countryPhoneOptions[0];
+  const isEtudiant         = profile === "ETUDIANT_ELEVE";
+  const showNiveauClasse   = isEtudiant;
+  const showNiveauLibre    = profile === "PROF";
+  const showNombreEleves   = profile === "SURVEILLANT" || profile === "PARENT";
+  const showEtablissement  = profile !== "PARENT";
   const classesDisponibles = niveauChoisi ? NIVEAUX_CLASSES[niveauChoisi] ?? [] : [];
+  const filieres           = FILIERES[niveauChoisi] ?? [];
+  const showFiliere        = isEtudiant && CLASSES_AVEC_FILIERE.includes(classeChoisie) && filieres.length > 0;
 
   /* ── Succès QR : reset + popup WA ── */
   useEffect(() => {
@@ -63,6 +78,7 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
       setProfile("ETUDIANT_ELEVE");
       setCountryIso("SN");
       setNiveauChoisi("");
+      setClasseChoisie("");
       setFormKey((k) => k + 1);
       const t = setTimeout(() => setShowWaPopup(true), 1000);
       return () => clearTimeout(t);
@@ -201,7 +217,7 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
               <Label htmlFor="niveauScolaire">Niveau</Label>
               <select id="niveauScolaire" name="niveauScolaire" disabled={isPending}
                 value={niveauChoisi}
-                onChange={(e) => { setNiveauChoisi(e.target.value); }}
+                onChange={(e) => { setNiveauChoisi(e.target.value); setClasseChoisie(""); }}
                 className="h-11 w-full rounded-lg border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">
                 <option value="">— Choisir un niveau —</option>
                 {Object.keys(NIVEAUX_CLASSES).map((n) => (
@@ -222,11 +238,27 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
                         "has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary",
                         "hover:bg-secondary",
                       )}>
-                      <input type="radio" name="classe" value={c} className="sr-only" required={!!niveauChoisi} disabled={isPending} />
+                      <input type="radio" name="classe" value={c} className="sr-only"
+                        required={!!niveauChoisi} disabled={isPending}
+                        onChange={() => setClasseChoisie(c)} />
                       {c}
                     </label>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Filière — Première et Terminale uniquement (Lycée Général ou Technique) */}
+            {showFiliere && (
+              <div className="space-y-2">
+                <Label htmlFor="filiere">Filière <span className="text-destructive">*</span></Label>
+                <select id="filiere" name="filiere" required disabled={isPending}
+                  className="h-11 w-full rounded-lg border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">
+                  <option value="">— Choisir une filière —</option>
+                  {filieres.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -261,7 +293,7 @@ export function StudentForm({ mode, cityId, campaignId }: Props) {
         {/* Boutons */}
         <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
           <Button type="reset" variant="outline" size="lg" className="sm:flex-1" disabled={isPending}
-            onClick={() => setNiveauChoisi("")}>
+            onClick={() => { setNiveauChoisi(""); setClasseChoisie(""); }}>
             Réinitialiser
           </Button>
           <Button type="submit" size="lg" className="sm:flex-[2]" disabled={isPending}>
