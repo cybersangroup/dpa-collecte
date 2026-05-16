@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { updateStatutInscription, deleteInscription } from "./actions";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 type Inscription = {
   id: string;
@@ -227,6 +227,7 @@ export function InscriptionsClient({
   const [bulkLoading, setBulkLoading]    = useState(false);
   const [showQR, setShowQR]              = useState(false);
   const [page, setPage]                  = useState(1);
+  const [pageSize, setPageSize]          = useState(20);
   const [deleteTarget, setDeleteTarget]  = useState<Inscription | null>(null);
   const [isPending, startTransition]     = useTransition();
 
@@ -263,8 +264,8 @@ export function InscriptionsClient({
     });
   }, [inscriptions, search, filterStatut, filterType]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const allSelected  = filtered.length > 0 && filtered.every((i) => selected.has(i.id));
   const someSelected = selected.size > 0;
@@ -457,26 +458,45 @@ export function InscriptionsClient({
         </div>
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <p className="text-xs text-muted-foreground">
-              Page {page} / {totalPages} · {filtered.length} résultat(s)
-            </p>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage(1)}>«</Button>
-              <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
-                const p = start + i;
-                if (p > totalPages) return null;
-                return (
-                  <Button key={p} variant={p === page ? "primary" : "outline"} size="md"
-                    onClick={() => setPage(p)} className="min-w-[2.25rem]">{p}</Button>
-                );
-              })}
-              <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</Button>
-              <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+        {filtered.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+            {/* Lignes par page + compteur */}
+            <div className="flex items-center gap-2">
+              <label htmlFor="inscriptions-page-size" className="text-xs text-muted-foreground whitespace-nowrap">
+                Lignes / page :
+              </label>
+              <select
+                id="inscriptions-page-size"
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">
+                — {filtered.length} résultat(s), page {page}/{totalPages}
+              </span>
             </div>
+            {/* Contrôles de page */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage(1)}>«</Button>
+                <Button variant="outline" size="md" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                  const p = start + i;
+                  if (p > totalPages) return null;
+                  return (
+                    <Button key={p} variant={p === page ? "primary" : "outline"} size="md"
+                      onClick={() => setPage(p)} className="min-w-[2.25rem]">{p}</Button>
+                  );
+                })}
+                <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>›</Button>
+                <Button variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+              </div>
+            )}
           </div>
         )}
       </div>
